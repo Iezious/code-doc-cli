@@ -1,0 +1,31 @@
+# Claude session guide — utils.codedoc
+
+`codedoc` is a CLI tool that builds a per-project SQLite index of a polyglot codebase (F#, C#, JS, TS, Go, Python, LSL) with hybrid BM25 + dense retrieval. It exists to power documentation-generation pipelines run by Claude agents.
+
+## Read first
+
+- `doc/CLAUDE.md` — layout of the `doc/` tree and conventions
+- `doc/architecture/overview.md` — what this tool is and why
+- `doc/architecture/architecture.md` — components and data flow
+- `doc/plans/` — current and past work plans, one file per task
+
+The architecture docs are the source of truth for design decisions. Don't add code that contradicts them without updating the doc in the same change.
+
+## Workflow expectations
+
+- Implementation lives under `src/codedoc/` once the build session begins. The tree is currently code-free by design.
+- Use `uv` for everything Python: `uv tool install --editable .` for install, `uv sync` for dev, `.venv/Scripts/python` to run scripts.
+- Path conventions: forward slashes, uppercase Windows drive letters, quoted paths with spaces.
+- Don't introduce languages, embedding backends, or storage choices not covered in `doc/architecture/`. If you need to, write the decision doc first.
+
+## Scope discipline
+
+- Engine is global, data is per-project. Engine code lives in this repo; per-project config and index data live in the target project's `docs/.helpers/`.
+- Schema versioning is mandatory — every persisted artifact carries the schema version it was built with.
+- This repo does not store any indices; `.sqlite` files are gitignored.
+
+## When working on this project
+
+- Architecture decisions go in `doc/architecture/`. New decisions get a new file or extend an existing one with a dated note.
+- Task plans go in `doc/plans/<YYYY-MM-DD>.<short-name>.md`.
+- Keep architecture docs concise: state the decision, name what was rejected, list implications. Avoid speculative future-scope writing.
