@@ -22,7 +22,7 @@ Cross-link between files where decisions interact. Treat the architecture docs a
 
 ### Current files
 
-- `overview.md` — what `codedoc` is and who uses it
+- `overview.md` — what `code_index` is and who uses it
 - `architecture.md` — components and data flow
 - `storage.md` — SQLite + sqlite-vec + FTS5 index design
 - `embeddings.md` — embedding backend choice and swap interface
@@ -30,7 +30,7 @@ Cross-link between files where decisions interact. Treat the architecture docs a
 - `chunking-and-languages.md` — language plugin interface and per-language notes
 - `cli.md` — command surface
 - `tool-and-data-split.md` — global engine vs per-project config and data
-- `docs-generation-pipeline.md` — how `codedoc` is used by the doc-gen pipeline
+- `docs-generation-pipeline.md` — how `code_index` is used by the doc-gen pipeline
 - `mvp-scope.md` — single source of truth for what ships in the MVP and what is cut
 - `config.md` — full `config.toml` schema, defaults, and validation rules
 - `errors-and-exit-codes.md` — CLI failure-mode contract (exit codes, `kind` strings, JSON envelope)

@@ -29,36 +29,36 @@ In-scope MVP items do **not** belong here, even if they were once open questions
 ### "Re-embed only" subcommand
 
 - Source: [embeddings](embeddings.md).
-- Why deferred: MVP uses `codedoc index rebuild` whenever the embedding model changes; a dedicated re-embed path preserves chunk rows and only rewrites the vec table.
+- Why deferred: MVP uses `code_index index rebuild` whenever the embedding model changes; a dedicated re-embed path preserves chunk rows and only rewrites the vec table.
 - What unlocks it: large indices where dropping and re-chunking on every model swap becomes painful enough to justify the extra subcommand.
 
 ## CLI surface additions
 
-### `codedoc watch` daemon mode
+### `code_index watch` daemon mode
 
 - Source: [cli](cli.md), [architecture](architecture.md).
 - Why deferred: live file watching is plausible but not part of MVP — explicit `index sync` covers the use case at lower implementation cost.
 - What unlocks it: a workflow where the latency between save and queryable index is a real productivity hit.
 
-### `codedoc search --explain`
+### `code_index search --explain`
 
 - Source: [cli](cli.md), [docs-generation-pipeline](docs-generation-pipeline.md).
 - Why deferred: cheap to add but not critical for MVP; useful for diagnosing which retrieval source (BM25 vs dense) contributed which chunk.
 - What unlocks it: first time a pipeline debug session needs per-source contributions to explain a surprising result.
 
-### `codedoc doctor`
+### `code_index doctor`
 
 - Source: [cli](cli.md), [mvp-scope](mvp-scope.md).
 - Why deferred: building a unified diagnostic before the inline-failure surface has shaken out risks codifying the wrong set of checks. Tracked here for visibility; the canonical deferral note lives in [mvp-scope](mvp-scope.md).
 - What unlocks it: enough real failures observed in pipeline use to know which checks are worth bundling.
 
-### `codedoc graph --depth` (transitive callers/deps)
+### `code_index graph --depth` (transitive callers/deps)
 
 - Source: [cli](cli.md).
 - Why deferred: depth > 1 requires iterative re-resolution against the symbols table at query time (see [storage](storage.md)'s Edge resolution); the cost model is O(result_size x depth) joins and was not worth bundling into MVP before measurements show a need.
 - What unlocks it: a real query pattern where a single-hop graph view leaves the consumer unable to answer their question without scripting around the CLI.
 
-### `codedoc seams` subcommand
+### `code_index seams` subcommand
 
 - Source: [docs-generation-pipeline](docs-generation-pipeline.md).
 - Why deferred: the seam *pass itself* is consumer pipeline work that composes `graph` + `symbols` + `search`; a dedicated engine subcommand should wait until the pass has run end-to-end and revealed its actual shape.
@@ -103,5 +103,5 @@ In-scope MVP items do **not** belong here, even if they were once open questions
 ### Workspace-level config
 
 - Source: [tool-and-data-split](tool-and-data-split.md).
-- Why deferred: MVP is per-project config only; a workspace-level config (e.g., `_Utils/codedoc.workspace.toml`) that defaults values across sibling projects is plausible but speculative without a real driver.
+- Why deferred: MVP is per-project config only; a workspace-level config (e.g., `_Utils/code_index.workspace.toml`) that defaults values across sibling projects is plausible but speculative without a real driver.
 - What unlocks it: a workspace with enough sibling projects that the per-project config files become substantially duplicated.

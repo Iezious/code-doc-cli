@@ -6,8 +6,8 @@ The **engine** is a globally installed CLI. The **index data and per-project con
 
 ```
 ~/ (or wherever uv tools land)
-  bin/codedoc                          # global engine, on PATH
-  share/code_doc_cli/                  # engine internals (Python package)
+  bin/code_index                       # global engine, on PATH
+  share/code_index/                    # engine internals (Python package)
 
 <project>/
   docs/
@@ -22,14 +22,14 @@ The **engine** is a globally installed CLI. The **index data and per-project con
 ## Rationale
 
 - **Reuse without coupling.** One install serves every project. Engine improvements land everywhere on upgrade; per-project tuning stays local.
-- **No global state leakage.** Behavior is fully determined by the project's config — no hidden `~/.codedoc/` caching that affects results.
+- **No global state leakage.** Behavior is fully determined by the project's config — no hidden `~/.code_index/` caching that affects results.
 - **Indices are build artifacts.** They belong with the project but not in the project's git history.
 - **Config travels with the project.** A team member who checks out the repo gets the indexing parameters without copying anything.
 
 ## Rejected alternatives
 
 - **Per-project tool install.** Wasteful, drifts across projects, complicates upgrades.
-- **Global index storage (`~/.codedoc/projects/...`).** Loses portability (project move/clone breaks the link); creates implicit coupling between unrelated projects sharing the host.
+- **Global index storage (`~/.code_index/projects/...`).** Loses portability (project move/clone breaks the link); creates implicit coupling between unrelated projects sharing the host.
 - **No config, all flags.** Forces every CLI invocation to repeat language list, roots, embedding choice — fragile and verbose for agents.
 
 ## What lives where
@@ -46,7 +46,7 @@ The **engine** is a globally installed CLI. The **index data and per-project con
 ## Versioning across the split
 
 - `pyproject.toml` carries the engine version.
-- `config.toml` carries a **tool version pin** (`codedoc.version = ">=0.3,<0.5"`).
+- `config.toml` carries a **tool version pin** (`code_index.version = ">=0.3,<0.5"`).
 - `meta.schema_version` inside the index records the schema the index was built with.
 
 On every invocation, the CLI checks:
@@ -55,14 +55,14 @@ On every invocation, the CLI checks:
 
 Loud failures, never silent drift.
 
-When teams install the engine pinned to a git tag (e.g. `...code-doc-cli.git@v0.1.0`), the `version` field in `config.toml` can be aligned with that tag so the version pin and the installed artifact agree.
+When teams install the engine pinned to a git tag (e.g. `...code_index.git@v0.1.0`), the `version` field in `config.toml` can be aligned with that tag so the version pin and the installed artifact agree.
 
 ## Custom language plugins
 
 A project may declare extra language modules:
 
 ```toml
-[codedoc]
+[code_index]
 extra_languages = ["./.helpers/lang_mydsl.py"]
 ```
 
@@ -72,23 +72,23 @@ These are loaded as ordinary Python modules and registered into the same plugin 
 
 ### End-user install
 
-1. `uv tool install git+https://github.com/Iezious/code-doc-cli.git` — installs the global CLI.
-2. In each target project: `codedoc init` to scaffold `docs/.helpers/`.
+1. `uv tool install git+https://github.com/Iezious/code_index.git` — installs the global CLI.
+2. In each target project: `code_index init` to scaffold `docs/.helpers/`.
 3. Tune `config.toml` per project (languages, roots, ignores, embed model).
-4. `codedoc index build` once, `codedoc index sync` on subsequent runs.
+4. `code_index index build` once, `code_index index sync` on subsequent runs.
 
 ### Engine development
 
 1. Clone the engine repo.
 2. `uv tool install --editable .` from the engine repo.
 
-This path is for working on `codedoc` itself, not for consuming projects.
+This path is for working on `code_index` itself, not for consuming projects.
 
 ## Onboarding a teammate
 
-- They install the engine themselves via `uv tool install git+https://github.com/Iezious/code-doc-cli.git`.
+- They install the engine themselves via `uv tool install git+https://github.com/Iezious/code_index.git`.
 - They checkout the target project; `docs/.helpers/config.toml` is already there.
-- They run `codedoc index build` once locally to populate the gitignored index.
+- They run `code_index index build` once locally to populate the gitignored index.
 
 There is no shared index distribution mechanism. Indices are cheap to rebuild and stale-bias is a real cost we are not paying to share them.
 

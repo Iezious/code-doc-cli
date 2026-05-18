@@ -2,7 +2,7 @@
 
 ## Decision
 
-`codedoc` is a CLI tool that builds a per-project SQLite index of a codebase across F#, C#, JavaScript, TypeScript, Go, Python, and LSL, exposes that index through hybrid BM25 + dense retrieval, and serves as the retrieval layer for documentation-generation pipelines run by Claude agents.
+`code_index` is a CLI tool that builds a per-project SQLite index of a codebase across F#, C#, JavaScript, TypeScript, Go, Python, and LSL, exposes that index through hybrid BM25 + dense retrieval, and serves as the retrieval layer for documentation-generation pipelines run by Claude agents.
 
 ## Rationale
 

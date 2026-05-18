@@ -2,57 +2,57 @@
 
 ## Decision
 
-`codedoc` is a single `typer`-based CLI binary with a small, stable subcommand surface. Every operation an agent or human needs is reachable from one command tree. The CLI is the only supported entry point — there is no Python API contract for external consumers.
+`code_index` is a single `typer`-based CLI binary with a small, stable subcommand surface. Every operation an agent or human needs is reachable from one command tree. The CLI is the only supported entry point — there is no Python API contract for external consumers.
 
 ## Rationale
 
 - Subagents invoke the tool via Bash. Stable, narrow flags beat a sprawling Python import surface.
-- A single binary keeps install simple (`uv tool install ...`) and discovery obvious (`codedoc --help`).
+- A single binary keeps install simple (`uv tool install ...`) and discovery obvious (`code_index --help`).
 - `typer` gives consistent help, completion, and argument validation across subcommands without ceremony.
 
 ## Subcommands
 
-### `codedoc init`
+### `code_index init`
 
 Initializes `docs/.helpers/` in the current project, writing a default `config.toml` and a `.gitignore` for the index file. Idempotent — refuses to overwrite an existing config without `--force`.
 
 ```
-codedoc init [--name <project-name>] [--force]
+code_index init [--name <project-name>] [--force]
 ```
 
-### `codedoc index build`
+### `code_index index build`
 
 Full index build. Walks roots from config, chunks, embeds, stores. Reports counts and timings.
 
 ```
-codedoc index build [--root <path>]   # override config roots
+code_index index build [--root <path>]   # override config roots
                     [--dry-run]        # walk and chunk but do not embed/store
                     [--verbose]
 ```
 
-### `codedoc index sync`
+### `code_index index sync`
 
 Incremental update. Uses `git diff` against `meta.last_commit` when available, falling back to mtime/hash comparison.
 
 ```
-codedoc index sync [--since <ref>]    # explicit base
+code_index index sync [--since <ref>]    # explicit base
                    [--verbose]
 ```
 
-### `codedoc index rebuild`
+### `code_index index rebuild`
 
 Drops and rebuilds. Required after embedding model changes.
 
 ```
-codedoc index rebuild [--yes]
+code_index index rebuild [--yes]
 ```
 
-### `codedoc search`
+### `code_index search`
 
 Hybrid BM25 + dense retrieval. See `retrieval.md`.
 
 ```
-codedoc search "<query>" [--lang <name>]
+code_index search "<query>" [--lang <name>]
                          [--k <int>]           # final top-N, default 20
                          [--bm25-k <int>]      # BM25 pool, default 100
                          [--dense-k <int>]     # dense pool, default 100
@@ -64,41 +64,41 @@ codedoc search "<query>" [--lang <name>]
 
 `--format json` returns a stable JSON array, suitable for agent consumption.
 
-### `codedoc symbols`
+### `code_index symbols`
 
 Symbol lookup over the stored symbols table.
 
 ```
-codedoc symbols defs <name>           # definitions matching name (substring by default, --exact for exact)
-codedoc symbols refs <name>           # references
+code_index symbols defs <name>           # definitions matching name (substring by default, --exact for exact)
+code_index symbols refs <name>           # references
                      [--lang <name>]
                      [--format text|json]
 ```
 
 Matching is **substring on `name` by default, case-sensitive**. `--exact` switches to exact-match. `--lang <name>` narrows to one language's symbols. Results include the `scope` field for disambiguation; agents that need a fully-qualified handle can concatenate `lang:scope:name`. The `name` strings themselves are plugin-emitted and not normalized by the engine — see [chunking-and-languages](chunking-and-languages.md), "Symbol identity", for the per-language conventions.
 
-### `codedoc graph`
+### `code_index graph`
 
 Lightweight dep / call queries over the edges table.
 
 ```
-codedoc graph callers <symbol>        # who points at this
-codedoc graph deps <path>             # what this file/chunk depends on
+code_index graph callers <symbol>        # who points at this
+code_index graph deps <path>             # what this file/chunk depends on
                    [--lang <name>]
                    [--format text|json]
 ```
 
 Graph subcommands accept the same `--lang` filter as `symbols`, and the `<symbol>` argument to `graph callers` follows the same substring-by-default, `--exact`-for-exact, case-sensitive rule (see [chunking-and-languages](chunking-and-languages.md), "Symbol identity").
 
-### `codedoc config show`
+### `code_index config show`
 
 Prints the resolved configuration (config file values merged with defaults) and the index metadata (schema version, embed model, last commit). Useful for "is my index up to date with my config?" checks.
 
 ```
-codedoc config show [--format text|json]
+code_index config show [--format text|json]
 ```
 
-### `codedoc doctor`
+### `code_index doctor`
 
 Intended to diagnose common problems in one place: missing extension, schema mismatch, model mismatch, stale index, missing API key for the configured backend.
 
@@ -114,7 +114,7 @@ Intended to diagnose common problems in one place: missing extension, schema mis
 
 - The CLI walks upward from the CWD looking for `docs/.helpers/config.toml`.
 - Found → all commands operate against that project.
-- Not found → most commands error with a pointer to `codedoc init`. Some (`--help`, `config show --no-project`) work without a config.
+- Not found → most commands error with a pointer to `code_index init`. Some (`--help`, `config show --no-project`) work without a config.
 
 ## Output discipline
 
@@ -132,9 +132,9 @@ Intended to diagnose common problems in one place: missing extension, schema mis
 
 ## Implications
 
-- Adding a subcommand is a code change in `code_doc_cli.cli`. Flag changes within a subcommand are minor; argument removal is breaking.
+- Adding a subcommand is a code change in `code_index.cli`. Flag changes within a subcommand are minor; argument removal is breaking.
 - The CLI is the integration point for the doc-gen pipeline — see `docs-generation-pipeline.md`.
 
 ## Open questions
 
-None pinned here. `codedoc watch` and `codedoc search --explain` were demoted to [roadmap](roadmap.md).
+None pinned here. `code_index watch` and `code_index search --explain` were demoted to [roadmap](roadmap.md).

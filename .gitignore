@@ -23,7 +23,7 @@ dist/
 .DS_Store
 Thumbs.db
 
-# codedoc indices (build artifacts if run inside own tree)
+# code_index indices (build artifacts if run inside own tree)
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal

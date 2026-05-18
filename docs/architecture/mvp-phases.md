@@ -23,7 +23,7 @@ This doc records *how the MVP gets built*. It introduces no new design decisions
 ### Phase 1 — Foundations
 
 - **Delivers:**
-  - Python package skeleton under `src/code_doc_cli/` (per project root `CLAUDE.md`).
+  - Python package skeleton under `src/code_index/` (per project root `CLAUDE.md`).
   - `pyproject.toml` set up for `uv tool install --editable .`, with the `[voyage]` install extra declared now even though the Voyage backend itself ships in Phase 7.
   - Storage layer: SQLite open helper, `sqlite-vec` extension load, FTS5 availability check, schema creation, `meta` table with `schema_version` written at create time, and a forward-only file-per-step migrations harness skeleton.
   - Config loader: TOML parse, full validation per [config](config.md), version-pin check, mapping of every failure to the correct `code` / `kind` from [errors-and-exit-codes](errors-and-exit-codes.md).
@@ -31,7 +31,7 @@ This doc records *how the MVP gets built*. It introduces no new design decisions
   - CLI scaffold: `typer` entry point with no-op subcommand stubs for every MVP subcommand named in [cli](cli.md), shared flags wired (`--config`, `--format`, `--verbose`, `--quiet`).
 - **Depends on:** none.
 - **Exercises:** [storage](storage.md), [config](config.md), [errors-and-exit-codes](errors-and-exit-codes.md), [cli](cli.md), [tool-and-data-split](tool-and-data-split.md).
-- **DoD:** `uv tool install --editable .` succeeds; `codedoc --help` lists every MVP subcommand; `codedoc config show --config <path>` validates a hand-written `config.toml`, prints resolved values to stdout, and exits 0; deliberately broken configs exit with the correct code / `kind` from [errors-and-exit-codes](errors-and-exit-codes.md).
+- **DoD:** `uv tool install --editable .` succeeds; `code_index --help` lists every MVP subcommand; `code_index config show --config <path>` validates a hand-written `config.toml`, prints resolved values to stdout, and exits 0; deliberately broken configs exit with the correct code / `kind` from [errors-and-exit-codes](errors-and-exit-codes.md).
 
 ### Phase 2 — Embedding backend
 
@@ -63,11 +63,11 @@ This doc records *how the MVP gets built*. It introduces no new design decisions
 - **Delivers:**
   - File walker implementing every rule in [architecture](architecture.md)'s "Indexer walking" section: `.gitignore` honoring, default excludes, max-file-size, NUL-byte binary detection, symlink policy, UTF-8 + replace fallback.
   - Indexer pipeline: walk → dispatch to plugin → batch chunk texts → embed → insert into `chunks` / `chunks_fts` / `embeddings` / `symbols` / `edges` / `meta`.
-  - `codedoc init` subcommand: writes the skeleton `config.toml` from [config](config.md)'s "What `init` writes" section, plus the `.gitignore` for the index file. Idempotent with `--force` override.
-  - `codedoc index build` subcommand with the flags from [cli](cli.md) (`--root`, `--dry-run`, `--verbose`).
+  - `code_index init` subcommand: writes the skeleton `config.toml` from [config](config.md)'s "What `init` writes" section, plus the `.gitignore` for the index file. Idempotent with `--force` override.
+  - `code_index index build` subcommand with the flags from [cli](cli.md) (`--root`, `--dry-run`, `--verbose`).
 - **Depends on:** Phases 1, 2, 3.
 - **Exercises:** [architecture](architecture.md) (Indexer walking), [cli](cli.md) (init, index build).
-- **DoD:** `codedoc init` followed by `codedoc index build` against a small polyglot fixture project (one file per supported language, plus a `.gitignore`'d directory and a binary file) populates all expected tables with the expected row counts; the binary and ignored files are absent from the index.
+- **DoD:** `code_index init` followed by `code_index index build` against a small polyglot fixture project (one file per supported language, plus a `.gitignore`'d directory and a binary file) populates all expected tables with the expected row counts; the binary and ignored files are absent from the index.
 
 ### Phase 5 — Search
 
@@ -76,7 +76,7 @@ This doc records *how the MVP gets built*. It introduces no new design decisions
   - `sqlite-vec` cosine query path.
   - Parallel issue + RRF fusion with `k = 60` per [retrieval](retrieval.md) (fixed, not configurable).
   - Filter application to **both pools** before fusion (`--lang`, `--kind`, `--path`).
-  - `codedoc search` subcommand with all flags from [cli](cli.md), including `--mode bm25|dense|hybrid`.
+  - `code_index search` subcommand with all flags from [cli](cli.md), including `--mode bm25|dense|hybrid`.
 - **Depends on:** Phases 1, 2, 3, 4.
 - **Exercises:** [retrieval](retrieval.md), [cli](cli.md) (search).
 - **DoD:** against the Phase-4 fixture, a known symbol-name query returns the expected `file:line`; a known conceptual query returns the expected chunk; `--mode bm25` and `--mode dense` each return their respective single-pool result list; `--mode hybrid` matches the default behavior.
@@ -84,19 +84,19 @@ This doc records *how the MVP gets built*. It introduces no new design decisions
 ### Phase 6 — Sync, symbols, graph, rebuild
 
 - **Delivers:**
-  - `codedoc index sync` subcommand using `git diff --name-only <meta.last_commit>..HEAD`, with mtime fallback for non-git trees.
-  - `codedoc index rebuild` subcommand (drop + build, gated by `--yes`).
-  - `codedoc symbols defs|refs` per [cli](cli.md) and the "Symbol identity" section of [chunking-and-languages](chunking-and-languages.md): substring by default, `--exact`, `--lang`, case-sensitive.
-  - `codedoc graph callers|deps` with lazy `dst_name`-to-`symbols.name` resolution per [storage](storage.md)'s "Edge resolution" section.
+  - `code_index index sync` subcommand using `git diff --name-only <meta.last_commit>..HEAD`, with mtime fallback for non-git trees.
+  - `code_index index rebuild` subcommand (drop + build, gated by `--yes`).
+  - `code_index symbols defs|refs` per [cli](cli.md) and the "Symbol identity" section of [chunking-and-languages](chunking-and-languages.md): substring by default, `--exact`, `--lang`, case-sensitive.
+  - `code_index graph callers|deps` with lazy `dst_name`-to-`symbols.name` resolution per [storage](storage.md)'s "Edge resolution" section.
 - **Depends on:** Phases 1, 2, 3, 4. Phase 5 is not required — sync, symbols, and graph do not depend on the search pipeline.
 - **Exercises:** [cli](cli.md) (sync, rebuild, symbols, graph), [storage](storage.md) (edge resolution), [chunking-and-languages](chunking-and-languages.md) (symbol identity).
-- **DoD:** edit one fixture file, run `codedoc index sync`, verify only that file's rows changed; `codedoc symbols defs <name>` returns expected hits with the right `scope`; `codedoc graph callers <symbol>` returns the expected source chunks; `codedoc graph deps <path>` returns expected target names, including any unresolved ones (the contract allows them).
+- **DoD:** edit one fixture file, run `code_index index sync`, verify only that file's rows changed; `code_index symbols defs <name>` returns expected hits with the right `scope`; `code_index graph callers <symbol>` returns the expected source chunks; `code_index graph deps <path>` returns expected target names, including any unresolved ones (the contract allows them).
 
 ### Phase 7 — Voyage, `config show`, JSON polish
 
 - **Delivers:**
   - Voyage `code-3` backend behind the `[voyage]` install extra, gated by `VOYAGE_API_KEY` per [embeddings](embeddings.md).
-  - `codedoc config show` subcommand: prints resolved config + index meta (schema_version, embed_model, last_commit) per [cli](cli.md). The Phase 1 stub is replaced with the full implementation here.
+  - `code_index config show` subcommand: prints resolved config + index meta (schema_version, embed_model, last_commit) per [cli](cli.md). The Phase 1 stub is replaced with the full implementation here.
   - `--format json` final pass: every subcommand returns a stable JSON shape on stdout for success and the error envelope from [errors-and-exit-codes](errors-and-exit-codes.md) on failure. The shape is documented inline per subcommand.
 - **Depends on:** Phases 1–6.
 - **Exercises:** [embeddings](embeddings.md) (Voyage), [cli](cli.md) (config show), [errors-and-exit-codes](errors-and-exit-codes.md) (JSON envelope), [config](config.md).

@@ -1,6 +1,6 @@
 # Claude session guide — utils.codedoc
 
-`codedoc` is a CLI tool that builds a per-project SQLite index of a polyglot codebase (F#, C#, JS, TS, Go, Python, LSL) with hybrid BM25 + dense retrieval. It exists to power documentation-generation pipelines run by Claude agents.
+`code_index` is a CLI tool that builds a per-project SQLite index of a polyglot codebase (F#, C#, JS, TS, Go, Python, LSL) with hybrid BM25 + dense retrieval. It exists to power documentation-generation pipelines run by Claude agents.
 
 ## Read first
 
@@ -13,7 +13,7 @@ The architecture docs are the source of truth for design decisions. Don't add co
 
 ## Workflow expectations
 
-- Implementation lives under `src/code_doc_cli/` once the build session begins. The tree is currently code-free by design.
+- Implementation lives under `src/code_index/` once the build session begins. The tree is currently code-free by design.
 - Use `uv` for everything Python: `uv tool install --editable .` for install, `uv sync` for dev, `.venv/Scripts/python` to run scripts.
 - Path conventions: forward slashes, uppercase Windows drive letters, quoted paths with spaces.
 - Don't introduce languages, embedding backends, or storage choices not covered in `docs/architecture/`. If you need to, write the decision doc first.

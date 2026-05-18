@@ -2,7 +2,7 @@
 
 ## Decision
 
-`codedoc` is structured as a CLI front end over a small set of cooperating modules: a language-plugin layer, an indexer pipeline, a SQLite storage layer (with `sqlite-vec` and FTS5), an embedding backend, and a retrieval/symbols/graph query layer. All modules are in-process; there is no network component.
+`code_index` is structured as a CLI front end over a small set of cooperating modules: a language-plugin layer, an indexer pipeline, a SQLite storage layer (with `sqlite-vec` and FTS5), an embedding backend, and a retrieval/symbols/graph query layer. All modules are in-process; there is no network component.
 
 ## High-level shape
 
@@ -36,17 +36,17 @@
 
 ## Components
 
-- **CLI** (`code_doc_cli.cli`) — `typer`-based entry point. Subcommands: `init`, `index build|sync`, `search`, `symbols`, `graph`, `config show`. See `cli.md`.
-- **Config** (`code_doc_cli.config`) — loads `docs/.helpers/config.toml`, validates against schema version pin, exposes resolved settings.
-- **Language plugins** (`code_doc_cli.languages.*`) — one module per language. Each implements `chunk`, `symbols`, and `imports`. Dispatch is by file extension. See `chunking-and-languages.md`.
-- **Chunker** (`code_doc_cli.chunker`) — thin dispatcher that picks the language plugin for a path and returns a normalized `Chunk` list.
-- **Embeddings** (`code_doc_cli.embeddings`) — backend interface with `fastembed` default and Voyage as an opt-in extra. See `embeddings.md`.
-- **Storage** (`code_doc_cli.storage`) — SQLite wrapper that owns connection lifecycle, loads the `sqlite-vec` extension, manages FTS5 tables, and runs schema migrations. See `storage.md`.
-- **Indexer** (`code_doc_cli.indexer`) — walks roots respecting config ignores, calls chunker, batches embeddings, inserts rows. Returns counts and timings.
-- **Sync** (`code_doc_cli.sync`) — git-aware incremental update. Diffs against the last indexed commit (or mtimes for non-git trees), re-embeds only changed chunks.
-- **Search** (`code_doc_cli.search`) — runs FTS5 BM25 and `sqlite-vec` cosine queries in parallel, fuses with RRF, returns ranked chunks with `file:line`. See `retrieval.md`.
-- **Symbols** (`code_doc_cli.symbols`) — pure index lookup over the stored symbols table. `defs`, `refs`. Powered by what plugins emitted at index time; symbol queries are index-only for determinism.
-- **Graph** (`code_doc_cli.graph`) — queries the edges table for `callers`, `deps`. Per-language plugins decide what counts as an edge (imports, listen channels, etc.).
+- **CLI** (`code_index.cli`) — `typer`-based entry point. Subcommands: `init`, `index build|sync`, `search`, `symbols`, `graph`, `config show`. See `cli.md`.
+- **Config** (`code_index.config`) — loads `docs/.helpers/config.toml`, validates against schema version pin, exposes resolved settings.
+- **Language plugins** (`code_index.languages.*`) — one module per language. Each implements `chunk`, `symbols`, and `imports`. Dispatch is by file extension. See `chunking-and-languages.md`.
+- **Chunker** (`code_index.chunker`) — thin dispatcher that picks the language plugin for a path and returns a normalized `Chunk` list.
+- **Embeddings** (`code_index.embeddings`) — backend interface with `fastembed` default and Voyage as an opt-in extra. See `embeddings.md`.
+- **Storage** (`code_index.storage`) — SQLite wrapper that owns connection lifecycle, loads the `sqlite-vec` extension, manages FTS5 tables, and runs schema migrations. See `storage.md`.
+- **Indexer** (`code_index.indexer`) — walks roots respecting config ignores, calls chunker, batches embeddings, inserts rows. Returns counts and timings.
+- **Sync** (`code_index.sync`) — git-aware incremental update. Diffs against the last indexed commit (or mtimes for non-git trees), re-embeds only changed chunks.
+- **Search** (`code_index.search`) — runs FTS5 BM25 and `sqlite-vec` cosine queries in parallel, fuses with RRF, returns ranked chunks with `file:line`. See `retrieval.md`.
+- **Symbols** (`code_index.symbols`) — pure index lookup over the stored symbols table. `defs`, `refs`. Powered by what plugins emitted at index time; symbol queries are index-only for determinism.
+- **Graph** (`code_index.graph`) — queries the edges table for `callers`, `deps`. Per-language plugins decide what counts as an edge (imports, listen channels, etc.).
 
 ## Data flow
 
@@ -83,7 +83,7 @@ The walker is the first stage of the indexer pipeline; it decides which files re
   - `dist/`, `build/`, `out/`, `target/`, `bin/`, `obj/`
   - `.idea/`, `.vscode/`
   - `docs/.helpers/` itself — the index lives here; never index your own index.
-- The `[codedoc].ignores` key in `config.toml` (see [config](config.md)) **appends to** — never replaces — the default excludes and `.gitignore` rules.
+- The `[code_index].ignores` key in `config.toml` (see [config](config.md)) **appends to** — never replaces — the default excludes and `.gitignore` rules.
 
 ### File-level filters
 
@@ -114,7 +114,7 @@ The walker is the first stage of the indexer pipeline; it decides which files re
 ## Non-goals
 
 - Distributed indexing.
-- Live file watching (a future `codedoc watch` command is possible but not in scope).
+- Live file watching (a future `code_index watch` command is possible but not in scope).
 - Cross-project federated search — each project has its own index; the doc-gen pipeline composes results at the orchestrator layer.
 
 ## Open questions

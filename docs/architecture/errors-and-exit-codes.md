@@ -2,13 +2,13 @@
 
 ## Decision
 
-Exit codes are part of the CLI contract and are stable across minor versions. They are how agents calling `codedoc` over Bash discriminate failure kinds programmatically.
+Exit codes are part of the CLI contract and are stable across minor versions. They are how agents calling `code_index` over Bash discriminate failure kinds programmatically.
 
 - **stderr** carries the human-readable failure message (one line summary, optional detail lines).
 - **stdout** stays empty on failure for human-format callers.
 - **`--format json` callers** additionally get a structured error envelope on stdout, so a single JSON read covers both success and failure shapes.
 
-`codedoc doctor` is **not in MVP** (see [mvp-scope](mvp-scope.md), deferred to v1.1). Until it ships, each subcommand emits its own categorized failure inline using the codes and `kind` strings defined here.
+`code_index doctor` is **not in MVP** (see [mvp-scope](mvp-scope.md), deferred to v1.1). Until it ships, each subcommand emits its own categorized failure inline using the codes and `kind` strings defined here.
 
 ## Rationale
 
@@ -75,7 +75,7 @@ Failures below are grouped by category. Each entry names the failure mode, the e
 - Malformed TOML → `config.parse_error`.
 - Missing required key (`version`) → `config.missing_key`.
 - Version pin unsatisfied by running engine → `config.version_mismatch`.
-- Unknown key under `[codedoc]` → **warning only, exit 0**, surfaced on stderr.
+- Unknown key under `[code_index]` → **warning only, exit 0**, surfaced on stderr.
 - `embed_backend` not in allowed values → `config.bad_enum`.
 - `embed_model` incompatible with selected backend → `config.model_backend_mismatch`.
 - `roots` path missing or unresolvable → `config.bad_path`.
@@ -96,7 +96,7 @@ See [storage](storage.md) for schema versioning and the loud-failure stance.
 
 ### Index/model (code 11)
 
-- Stored `meta.embed_dim` differs from the active backend's reported dim → `index.embed_dim_mismatch`. Engine refuses queries and prompts for `codedoc index rebuild`.
+- Stored `meta.embed_dim` differs from the active backend's reported dim → `index.embed_dim_mismatch`. Engine refuses queries and prompts for `code_index index rebuild`.
 - Stored `meta.embed_model` differs from `config.embed_model` → `index.embed_model_mismatch`. Same disposition.
 
 See [embeddings](embeddings.md) and [storage](storage.md).
@@ -130,7 +130,7 @@ For parsing and IO categories, default behavior is **skip the offending file, wa
 - The `--format json` envelope on success and the per-subcommand JSON shapes: [cli](cli.md).
 - Schema-version and model-mismatch checks that raise codes `10` and `11`: [storage](storage.md).
 - Config validation rules that raise code `2`: [config](config.md).
-- The deferral of `codedoc doctor` and the rationale for waiting on the inline-error surface to settle: [mvp-scope](mvp-scope.md).
+- The deferral of `code_index doctor` and the rationale for waiting on the inline-error surface to settle: [mvp-scope](mvp-scope.md).
 
 ## Implications
 
@@ -141,4 +141,4 @@ For parsing and IO categories, default behavior is **skip the offending file, wa
 
 ## Open questions
 
-None pinned here. When `codedoc doctor` is designed (v1.1), it will compose checks against this same code/kind surface; no new contract should be needed.
+None pinned here. When `code_index doctor` is designed (v1.1), it will compose checks against this same code/kind surface; no new contract should be needed.

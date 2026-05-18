@@ -1,10 +1,10 @@
-# codedoc
+# code_index
 
 Universal codebase index and hybrid semantic/lexical search, built to power Claude Code documentation-generation pipelines across polyglot repositories.
 
 ## What it is
 
-A CLI tool (`codedoc`) that walks a codebase, chunks it AST-aware per language, embeds the chunks locally, and stores everything in a per-project SQLite index alongside BM25 full-text search and a lightweight symbol/dep graph. Agents and humans query it the same way.
+A CLI tool (`code_index`) that walks a codebase, chunks it AST-aware per language, embeds the chunks locally, and stores everything in a per-project SQLite index alongside BM25 full-text search and a lightweight symbol/dep graph. Agents and humans query it the same way.
 
 Supported languages: F#, C#, JavaScript, TypeScript, Go, Python, LSL.
 
@@ -19,15 +19,15 @@ Design phase. Implementation begins in a separate session. See `docs/architectur
 ## Install
 
 ```bash
-uv tool install git+https://github.com/Iezious/code-doc-cli.git
+uv tool install git+https://github.com/Iezious/code_index.git
 ```
 
-Installs `codedoc` on PATH. Reads per-project config from `docs/.helpers/config.toml`.
+Installs `code_index` on PATH. Reads per-project config from `docs/.helpers/config.toml`.
 
 ### Update
 
 ```bash
-uv tool upgrade code-doc-cli
+uv tool upgrade code_index
 ```
 
 Pulls the latest from the same source URL used at install.
@@ -35,7 +35,7 @@ Pulls the latest from the same source URL used at install.
 ### Pinning to a tag
 
 ```bash
-uv tool install git+https://github.com/Iezious/code-doc-cli.git@v0.1.0
+uv tool install git+https://github.com/Iezious/code_index.git@v0.1.0
 ```
 
 Optional, for users who want a stable version rather than tracking `HEAD`.
@@ -43,7 +43,7 @@ Optional, for users who want a stable version rather than tracking `HEAD`.
 ### Voyage backend (optional)
 
 ```bash
-uv tool install "git+https://github.com/Iezious/code-doc-cli.git[voyage]"
+uv tool install "git+https://github.com/Iezious/code_index.git[voyage]"
 ```
 
 Requires `VOYAGE_API_KEY` in the environment.
@@ -54,17 +54,17 @@ Requires `VOYAGE_API_KEY` in the environment.
 uv tool install --editable .
 ```
 
-If you're hacking on `codedoc` itself, clone the repo and use the editable install.
+If you're hacking on `code_index` itself, clone the repo and use the editable install.
 
 ## CLI surface (planned)
 
 ```
-codedoc init
-codedoc index build
-codedoc index sync
-codedoc search "..." --lang lsl --k 10
-codedoc symbols defs Foo
-codedoc graph callers Bar
+code_index init
+code_index index build
+code_index index sync
+code_index search "..." --lang lsl --k 10
+code_index symbols defs Foo
+code_index graph callers Bar
 ```
 
 See `docs/architecture/cli.md` for the full command surface.

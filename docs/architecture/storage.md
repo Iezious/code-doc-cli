@@ -33,7 +33,7 @@ meta(
   key TEXT PRIMARY KEY,
   value TEXT
 )
--- holds: schema_version, codedoc_version, last_commit, embed_model, embed_dim
+-- holds: schema_version, code_index_version, last_commit, embed_model, embed_dim
 
 chunks(
   id INTEGER PRIMARY KEY,
@@ -95,8 +95,8 @@ Consequences:
 ## Schema versioning
 
 - `meta.schema_version` is written at index creation.
-- On every open, storage checks the running engine's expected version. Mismatch is **loud**: refuse to query and prompt for `codedoc index rebuild` or a documented migration.
-- Migrations are forward-only and live in `code_doc_cli.storage.migrations.<from>_to_<to>.py`.
+- On every open, storage checks the running engine's expected version. Mismatch is **loud**: refuse to query and prompt for `code_index index rebuild` or a documented migration.
+- Migrations are forward-only and live in `code_index.storage.migrations.<from>_to_<to>.py`.
 - The version is bumped on any schema-affecting change, however small. Silent drift is the failure mode we are paying overhead to prevent.
 
 ## Embedding storage
@@ -112,7 +112,7 @@ An embedding cache keyed by chunk content hash is **deferred** (see [mvp-scope](
 - Indexer takes a single write connection; readers (search, symbols, graph) use separate read connections.
 - No long-running transactions in readers.
 
-Readers see a **SQLite snapshot pinned at connection time**: a reader observes a consistent view of the database as of the moment it opened its connection, and concurrent writes by an indexer or `index sync` are invisible until that reader closes and reopens. Long-running agent loops (planner-explorer iterations, multi-phase doc generation) that want to pick up newer index state must reopen between phases; the CLI exits between invocations, so an agent that issues one `codedoc` call per query already gets fresh state naturally. This is what makes determinism affordable in practice — a single planner-explorer iteration sees one consistent index even if a `codedoc index sync` is racing in the background, and there is no read-side coordination cost for the common case. See [docs-generation-pipeline](docs-generation-pipeline.md) for why this matters to the consumer.
+Readers see a **SQLite snapshot pinned at connection time**: a reader observes a consistent view of the database as of the moment it opened its connection, and concurrent writes by an indexer or `index sync` are invisible until that reader closes and reopens. Long-running agent loops (planner-explorer iterations, multi-phase doc generation) that want to pick up newer index state must reopen between phases; the CLI exits between invocations, so an agent that issues one `code_index` call per query already gets fresh state naturally. This is what makes determinism affordable in practice — a single planner-explorer iteration sees one consistent index even if a `code_index index sync` is racing in the background, and there is no read-side coordination cost for the common case. See [docs-generation-pipeline](docs-generation-pipeline.md) for why this matters to the consumer.
 
 ## Implications
 

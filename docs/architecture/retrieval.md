@@ -2,7 +2,7 @@
 
 ## Decision
 
-Retrieval is **hybrid**: every search query runs an FTS5 BM25 query and a `sqlite-vec` cosine query in parallel, then fuses them with **Reciprocal Rank Fusion (RRF)** to produce the final ranked list. The same hybrid pipeline serves both `codedoc search` (for humans and agents) and any internal lookup the planner-explorer pipeline issues.
+Retrieval is **hybrid**: every search query runs an FTS5 BM25 query and a `sqlite-vec` cosine query in parallel, then fuses them with **Reciprocal Rank Fusion (RRF)** to produce the final ranked list. The same hybrid pipeline serves both `code_index search` (for humans and agents) and any internal lookup the planner-explorer pipeline issues.
 
 ## Rationale
 
@@ -32,7 +32,7 @@ Items appearing in both lists have their contributions summed. Final ranking is 
 ## Query shape
 
 ```
-codedoc search "<query>" [--lang fsharp|csharp|js|ts|go|python|lsl]
+code_index search "<query>" [--lang fsharp|csharp|js|ts|go|python|lsl]
                          [--k <int>]              # final top-N
                          [--project <name>]
                          [--kind function|type|...]

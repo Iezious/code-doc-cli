@@ -2,13 +2,13 @@
 
 ## Decision
 
-Per-project configuration is a single TOML file at `docs/.helpers/config.toml`, committed to the project's git history. All keys live under one `[codedoc]` table. There is no other configuration surface (no environment-variable overrides for behavior, no per-subcommand config files); only `--config <path>` can redirect the loader to a different file.
+Per-project configuration is a single TOML file at `docs/.helpers/config.toml`, committed to the project's git history. All keys live under one `[code_index]` table. There is no other configuration surface (no environment-variable overrides for behavior, no per-subcommand config files); only `--config <path>` can redirect the loader to a different file.
 
 This doc owns the schema. Loader internals belong in the implementation; rationale for the file location and version pinning belongs in [tool-and-data-split](tool-and-data-split.md); rationale for backend choices belongs in [embeddings](embeddings.md); the consumer of `config show` is documented in [cli](cli.md).
 
 ## Rationale
 
-- **One table, one place.** Scattering config across multiple files or sections invites drift. `[codedoc]` is flat enough to scan and structured enough that future sections (`[codedoc.languages.fsharp]`, etc.) can be added without breaking existing keys.
+- **One table, one place.** Scattering config across multiple files or sections invites drift. `[code_index]` is flat enough to scan and structured enough that future sections (`[code_index.languages.fsharp]`, etc.) can be added without breaking existing keys.
 - **TOML, not JSON or YAML.** TOML round-trips comments cleanly, has a single dialect, and is the default for `pyproject.toml` — the project already lives in that ecosystem.
 - **Committed.** Teammates checking out the repo get the indexing parameters for free; index reproducibility requires the same config.
 
@@ -16,12 +16,12 @@ This doc owns the schema. Loader internals belong in the implementation; rationa
 
 - **JSON.** No comments. Painful for a file humans hand-edit.
 - **YAML.** Multiple dialects, indentation-sensitive, surprising type coercions.
-- **`pyproject.toml` `[tool.codedoc]` section.** Couples the index config to the *consuming* project's Python packaging, which is wrong for polyglot projects that may not have a `pyproject.toml` at all.
+- **`pyproject.toml` `[tool.code_index]` section.** Couples the index config to the *consuming* project's Python packaging, which is wrong for polyglot projects that may not have a `pyproject.toml` at all.
 - **Environment-variable overrides for behavior keys.** Hidden state that breaks reproducibility. Env vars are reserved for *secrets* (`VOYAGE_API_KEY`), not behavior.
 
 ## Schema
 
-All keys are under `[codedoc]`. Types are TOML types; "list of X" means a TOML array of values of type X.
+All keys are under `[code_index]`. Types are TOML types; "list of X" means a TOML array of values of type X.
 
 | Key | Type | Required | Default | Description |
 |---|---|---|---|---|
@@ -38,7 +38,7 @@ All keys are under `[codedoc]`. Types are TOML types; "list of X" means a TOML a
 ### Example
 
 ```toml
-[codedoc]
+[code_index]
 version          = ">=0.3,<0.5"
 project          = "utils.codedoc"
 roots            = ["src", "tests"]
@@ -58,14 +58,14 @@ embed_batch_size = 32
 - `roots` paths must exist and resolve under the project root.
 - `extra_languages` paths must exist and be readable Python files.
 - `languages` must be a subset of the names registered in the plugin registry (built-ins plus anything `extra_languages` adds).
-- Unknown keys under `[codedoc]` produce a warning, not a failure — forward-compatibility for older engines reading a config written for a newer one.
+- Unknown keys under `[code_index]` produce a warning, not a failure — forward-compatibility for older engines reading a config written for a newer one.
 
 ## What `init` writes
 
-`codedoc init` writes a minimal skeleton. Only the keys below are pinned in the generated file; everything else is left to its default and can be added on demand.
+`code_index init` writes a minimal skeleton. Only the keys below are pinned in the generated file; everything else is left to its default and can be added on demand.
 
 ```toml
-[codedoc]
+[code_index]
 version       = ">=<current>,<<current-major+2>"   # pinned to the engine version that ran init
 project       = "<directory-name>"
 roots         = ["."]
@@ -80,12 +80,12 @@ The intent is that the file is small enough to read on first open and obvious en
 - File location and the rationale for committing it: [tool-and-data-split](tool-and-data-split.md).
 - Engine version pin semantics across the tool/data split: [tool-and-data-split](tool-and-data-split.md).
 - Backend choices and the rationale for the fastembed default: [embeddings](embeddings.md).
-- `codedoc config show` semantics (prints resolved config plus index meta): [cli](cli.md).
+- `code_index config show` semantics (prints resolved config plus index meta): [cli](cli.md).
 - Failure exit codes and `kind` strings for each validation rule: [errors-and-exit-codes](errors-and-exit-codes.md).
 
 ## Implications
 
-- Changing `embed_backend` or `embed_model` requires `codedoc index rebuild`; the engine refuses queries against an index whose `meta.embed_model` does not match config (see [storage](storage.md) and [errors-and-exit-codes](errors-and-exit-codes.md)).
+- Changing `embed_backend` or `embed_model` requires `code_index index rebuild`; the engine refuses queries against an index whose `meta.embed_model` does not match config (see [storage](storage.md) and [errors-and-exit-codes](errors-and-exit-codes.md)).
 - `extra_languages` is the supported extension point for project-specific DSLs. The engine stays free of per-project conditionals.
 - Because unknown keys only warn, a project pinned to a newer engine can be opened by an older engine without exploding — but the older engine cannot honor the unknown keys, so behavior will differ. The `version` pin is the guard against that.
 

@@ -2,7 +2,7 @@
 
 ## Decision
 
-This document is the single source of truth for what ships in the MVP of `codedoc`. The phrase "MVP" appears as an inline qualifier across other architecture docs; when they disagree with this file, this file wins until updated.
+This document is the single source of truth for what ships in the MVP of `code_index`. The phrase "MVP" appears as an inline qualifier across other architecture docs; when they disagree with this file, this file wins until updated.
 
 If a feature is not listed in either column below, treat it as **implicitly out of MVP** until a decision is added here.
 
@@ -57,7 +57,7 @@ The walker honors `.gitignore` plus a built-in set of default excludes. The exac
 
 Each item below is named, dated to "after MVP," and given the reason it was cut. Anything not on either list is implicitly out-of-MVP.
 
-### `codedoc doctor` — deferred to v1.1
+### `code_index doctor` — deferred to v1.1
 
 Pipelines will rely on the inline error messages emitted by each subcommand (see [errors-and-exit-codes](errors-and-exit-codes.md)) until the real failure-mode surface has shaken out under use. Building a unified `doctor` before we know which checks matter risks codifying the wrong set.
 
@@ -65,11 +65,11 @@ Pipelines will rely on the inline error messages emitted by each subcommand (see
 
 MVP `index sync` always re-embeds changed files. The `chunks.content_hash` column is **not present in the MVP schema** — it lands together with the cache feature via a schema bump, not as a dormant column. The [storage](storage.md) schema sketch reflects this.
 
-### `codedoc watch` daemon mode — deferred
+### `code_index watch` daemon mode — deferred
 
 Already called out as not-in-scope in [architecture](architecture.md) and [cli](cli.md). Restated here for completeness.
 
-### `codedoc search --explain` — deferred
+### `code_index search --explain` — deferred
 
 Already an open question in [retrieval](retrieval.md) and [cli](cli.md). Cheap to add later; not on the MVP critical path.
 
@@ -89,7 +89,7 @@ Already an open question in [chunking-and-languages](chunking-and-languages.md).
 
 Already stated in [chunking-and-languages](chunking-and-languages.md). Requires per-project conventions the engine cannot assume.
 
-### Cross-language graph pass and `codedoc seams` subcommand — deferred
+### Cross-language graph pass and `code_index seams` subcommand — deferred
 
 The **seam pass itself** is consumer pipeline work and is documented in [docs-generation-pipeline](docs-generation-pipeline.md). The **engine subcommand** that would return producer/consumer pairs directly is open in that same doc and lands in v1.x at the earliest, once the seam pass has been run end-to-end and revealed its actual shape.
 

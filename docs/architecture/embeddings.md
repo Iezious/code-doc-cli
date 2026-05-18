@@ -38,7 +38,7 @@ class EmbeddingBackend(Protocol):
 Backends are instantiated from config:
 
 ```toml
-[codedoc]
+[code_index]
 embed_backend = "fastembed"           # or "voyage"
 embed_model   = "jinaai/jina-embeddings-v2-base-code"
 ```
@@ -49,7 +49,7 @@ Voyage requires `VOYAGE_API_KEY` in the environment. Absence is detected at back
 
 - Switching the model **changes the vector dimension** in general. The stored embeddings are tied to one model.
 - The indexer refuses to insert vectors with a different dimension than the existing `embeddings` table.
-- `codedoc index rebuild` is the supported migration path: drops embeddings, re-embeds with the new model. Other tables are preserved where dimension is irrelevant.
+- `code_index index rebuild` is the supported migration path: drops embeddings, re-embeds with the new model. Other tables are preserved where dimension is irrelevant.
 - A future enhancement is a "re-embed only" subcommand that keeps chunk rows and just rewrites the vec table. Not part of the MVP.
 
 ## Batching and throughput
