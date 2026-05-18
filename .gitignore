@@ -28,3 +28,4 @@ Thumbs.db
 *.sqlite-shm
 *.sqlite-wal
 .helpers/index.sqlite
+.claude/settings.local.json
