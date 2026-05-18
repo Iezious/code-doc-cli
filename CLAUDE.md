@@ -13,7 +13,7 @@ The architecture docs are the source of truth for design decisions. Don't add co
 
 ## Workflow expectations
 
-- Implementation lives under `src/codedoc/` once the build session begins. The tree is currently code-free by design.
+- Implementation lives under `src/code_doc_cli/` once the build session begins. The tree is currently code-free by design.
 - Use `uv` for everything Python: `uv tool install --editable .` for install, `uv sync` for dev, `.venv/Scripts/python` to run scripts.
 - Path conventions: forward slashes, uppercase Windows drive letters, quoted paths with spaces.
 - Don't introduce languages, embedding backends, or storage choices not covered in `doc/architecture/`. If you need to, write the decision doc first.

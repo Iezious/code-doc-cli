@@ -24,6 +24,7 @@ encode(texts: list[str]) -> ndarray of shape (N, D)
 - **OpenAI `text-embedding-3-small` as default.** Weaker than Jina code-v2 on code, and not free. No reason to pick it.
 - **Local sentence-transformers without fastembed.** Heavier dependency, slower startup, no ONNX quantization out of the box.
 - **Running our own embedding service.** Out of scope.
+- **Ensemble of two embedding models.** Rare; usually not worth the complexity. Rejected by default.
 
 ## Backend interface
 
@@ -53,14 +54,13 @@ Voyage requires `VOYAGE_API_KEY` in the environment. Absence is detected at back
 
 ## Batching and throughput
 
-- Texts are batched (typical batch size 32–64) before each `encode` call. Tunable in config.
+- Texts are batched (default 32 per `embed_batch_size` in [config](config.md), tunable per project) before each `encode` call.
 - The indexer measures and reports chunks/second for visibility.
 - fastembed runs on CPU by default. GPU paths (CUDA, DirectML) are not in scope but not blocked by the interface.
 
 ## Caching
 
-- A content-hash column on `chunks` enables an embedding cache: if a chunk with identical text already has an embedding, skip the re-embed.
-- Cache invalidation is automatic when the model changes (different `meta.embed_model` value).
+An embedding cache keyed by chunk content hash is **planned for v1.1 and not in MVP** (see [mvp-scope](mvp-scope.md), [storage](storage.md)). When it lands, a `chunks.content_hash` column will let the indexer skip re-embedding any chunk whose text matches an already-embedded one, and cache entries will be implicitly invalidated when `meta.embed_model` changes. The column and the cache logic land together via a schema bump rather than as a dormant column in MVP.
 
 ## Implications
 
@@ -70,5 +70,4 @@ Voyage requires `VOYAGE_API_KEY` in the environment. Absence is detected at back
 
 ## Open questions
 
-- Whether to ship a small benchmark harness so a user can compare backends on their own corpus. Useful but not MVP.
-- Whether to support an "ensemble" of two embedding models (rare; usually not worth the complexity). Rejected by default.
+None pinned here. A benchmark harness for comparing backends was demoted to [roadmap](roadmap.md); the ensemble option is now recorded under "Rejected alternatives" above.

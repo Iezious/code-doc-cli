@@ -48,5 +48,4 @@ Out of scope:
 
 ## Open questions
 
-- Whether the cross-language graph pass (e.g., HTTP endpoint defined in F#, called from TS) lands in v1 or as a follow-on. Currently deferred.
-- Whether to publish to a private package index for team install or keep editable installs only. Defaults to editable for now.
+None pinned here. The cross-language graph pass and private-package-index publishing were demoted to [roadmap](roadmap.md).

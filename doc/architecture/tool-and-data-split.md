@@ -7,7 +7,7 @@ The **engine** is a globally installed CLI. The **index data and per-project con
 ```
 ~/ (or wherever uv tools land)
   bin/codedoc                          # global engine, on PATH
-  share/codedoc/                       # engine internals (Python package)
+  share/code_doc_cli/                  # engine internals (Python package)
 
 <project>/
   docs/
@@ -55,6 +55,8 @@ On every invocation, the CLI checks:
 
 Loud failures, never silent drift.
 
+When teams install the engine pinned to a git tag (e.g. `...code-doc-cli.git@v0.1.0`), the `version` field in `config.toml` can be aligned with that tag so the version pin and the installed artifact agree.
+
 ## Custom language plugins
 
 A project may declare extra language modules:
@@ -68,15 +70,23 @@ These are loaded as ordinary Python modules and registered into the same plugin 
 
 ## Install workflow
 
-1. Clone or check out the engine repo.
+### End-user install
+
+1. `uv tool install git+https://github.com/Iezious/code-doc-cli.git` — installs the global CLI.
+2. In each target project: `codedoc init` to scaffold `docs/.helpers/`.
+3. Tune `config.toml` per project (languages, roots, ignores, embed model).
+4. `codedoc index build` once, `codedoc index sync` on subsequent runs.
+
+### Engine development
+
+1. Clone the engine repo.
 2. `uv tool install --editable .` from the engine repo.
-3. In each target project: `codedoc init` to scaffold `docs/.helpers/`.
-4. Tune `config.toml` per project (languages, roots, ignores, embed model).
-5. `codedoc index build` once, `codedoc index sync` on subsequent runs.
+
+This path is for working on `codedoc` itself, not for consuming projects.
 
 ## Onboarding a teammate
 
-- They install the engine themselves (editable from a clone, or eventually `uv tool install` from a private package index).
+- They install the engine themselves via `uv tool install git+https://github.com/Iezious/code-doc-cli.git`.
 - They checkout the target project; `docs/.helpers/config.toml` is already there.
 - They run `codedoc index build` once locally to populate the gitignored index.
 
@@ -90,5 +100,4 @@ There is no shared index distribution mechanism. Indices are cheap to rebuild an
 
 ## Open questions
 
-- Whether to publish the engine to a private package index. Defaults to editable-install for now; revisit when more than one consumer needs it.
-- Whether to support a workspace-level config (e.g., `_Utils/codedoc.workspace.toml`) that defaults values across sibling projects. Plausible; deferred until a clear need shows up.
+None pinned here. Private-package-index publishing and workspace-level config were demoted to [roadmap](roadmap.md).

@@ -111,12 +111,32 @@ A plugin returning empty lists is valid (e.g., LSL has no imports in the traditi
 - **Symbols:** `llXxx` function references emitted as `ref` symbols, helps lexical search.
 - **Edges:** `listen` channels, `link_message` channels, `llHTTPRequest` endpoints, `llEmail` recipients — all as edges of distinct kinds.
 - **OpenSim / OSSL:** an opt-in flag in plugin config enables `osXxx` recognition. Default is pure LSL.
+- **Event-payload schema extraction is out of scope.** Attempting to infer what `link_message` integer/string parameters *mean* would require per-project conventions the engine cannot assume; the plugin emits the channel and edge kind, and leaves interpretation to consumers.
 
 ## Dispatch and registry
 
 - Plugins register themselves by extension at import time.
 - The chunker resolves an extension to a plugin via a static registry; unknown extensions are skipped silently unless `--strict` is set.
 - A project's `config.toml` selects which language plugins are active; disabled languages are not even imported.
+
+## Symbol identity
+
+Plugins emit symbol `name` strings using their own language-idiomatic form; storage records them verbatim. There is no engine-level normalization — no case-folding, no namespace-stripping, no language-prefixing. The `symbols` table is the global lookup; uniqueness is not enforced (two languages may legitimately share a `name`), and `--lang` is the disambiguator at query time. See [cli](cli.md) for the matching contract.
+
+- **Case-sensitivity:** case-sensitive by default. Every MVP language (LSL included; F# included) is itself case-sensitive. A future `--ignore-case` flag is plausible but not in MVP.
+- **Scope field:** a symbol's `scope` carries the enclosing context (module, class, state) when applicable. Queries that need to disambiguate two same-named symbols can additionally filter on `scope`.
+
+### Recommended per-plugin conventions
+
+These are conventions, not enforced rules — but consistency makes queries less surprising.
+
+- **F#:** `Module.SubModule.name`. Discriminated union cases as `Module.TypeName.CaseName`.
+- **C#:** `Namespace.Type.Member`. Generic type parameters stripped from `name` but recorded in `scope` if useful.
+- **Go:** `package.Name` for top-level; `package.Receiver.Method` for methods.
+- **JS:** export name as written; default exports → `default::<filename-without-extension>`.
+- **TS:** same as JS, plus type-only exports included.
+- **Python:** dotted from the module root within the project — `module.Class.method`.
+- **LSL:** event handlers as `<state>.<event>`; user functions and globals by bare name.
 
 ## Implications
 
@@ -126,6 +146,4 @@ A plugin returning empty lists is valid (e.g., LSL has no imports in the traditi
 
 ## Open questions
 
-- Whether to emit *generated* code as a distinct chunk kind so the indexer can de-emphasize it in retrieval. Likely yes; deferred.
-- Whether to chunk Markdown (READMEs, doc files) as well, so retrieval surfaces design notes alongside code. Possibly v1.1; not MVP.
-- LSL: whether to attempt event-payload schema extraction (e.g., what `link_message` parameters mean). Out of scope; would require per-project conventions.
+None pinned here. Generated-code chunk-kind tagging and Markdown chunking were demoted to [roadmap](roadmap.md); LSL event-payload schema extraction is recorded as out-of-scope in the LSL plugin section above.

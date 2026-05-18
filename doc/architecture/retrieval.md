@@ -27,6 +27,8 @@ contribution(item) = 1 / (k + rank(item))      with k = 60
 
 Items appearing in both lists have their contributions summed. Final ranking is by total contribution, descending. Ties broken by rank in the dense list (semantic preferred for equal contribution).
 
+`k` is fixed at 60 in MVP and is **not** exposed in config. The published default works well without per-corpus tuning, and exposing it invites cargo-cult adjustment. Revisit only if a specific corpus shows measurable evidence to change.
+
 ## Query shape
 
 ```
@@ -72,6 +74,4 @@ Larger pools improve recall at the cost of query latency. Defaults are tuned for
 
 ## Open questions
 
-- Whether to expose `--mode bm25|dense|hybrid` for diagnostics. Likely yes; cheap to add.
-- Whether RRF `k` should be tunable in config. Probably leave at 60 unless a corpus shows clear evidence to change.
 - Whether to add a coarse rerank step (e.g., BM25 over the fused top 50) for niche-language queries. Deferred; revisit if LSL retrieval is weak.

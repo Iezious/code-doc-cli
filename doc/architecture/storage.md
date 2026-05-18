@@ -45,8 +45,7 @@ chunks(
   kind TEXT,         -- function, type, module, state, event, class, ...
   name TEXT,         -- best-effort symbol name for the chunk
   scope TEXT,        -- enclosing scope (module path, state name, etc.)
-  content TEXT,
-  content_hash TEXT  -- for embedding cache
+  content TEXT
 )
 
 chunks_fts USING FTS5(content, name, scope, content='chunks', content_rowid='id')
@@ -74,24 +73,46 @@ edges(
 
 Indices on `chunks(path)`, `chunks(language)`, `symbols(name)`, `edges(dst_name)`, `edges(src_chunk_id)`.
 
+## Edge resolution
+
+Edges are **resolved lazily at query time**, not at index-write time.
+
+- Language plugins emit edges with `dst_name` as a free-form string — symbol name, module path, channel id, URL, whatever the plugin's edge `kind` defines. Plugins do not look up symbol ids when emitting edges.
+- Resolution happens inside `graph callers` / `graph deps` by joining `edges.dst_name` against `symbols.name`, with any filters from the query (language, kind, etc.) applied. The query layer is the only place that knows how to interpret resolution semantics; the storage layer keeps the raw strings.
+
+Consequences:
+
+- **Renames** are handled correctly without rewriting `edges` rows. The next `index sync` updates the affected symbol rows; subsequent queries see the new resolution.
+- **Deletions** leave dangling `dst_name` strings; the join naturally returns no match. The query layer can report these as unresolved on request — useful for agents asking "what call sites point at nothing?".
+- **Cross-file and cross-language edges** need no special handling — symbol lookup is global by name within the chosen filters.
+- **Performance:** the `symbols(name)` index is the hot path. For a 50k-chunk index this stays well inside the latency budget in [retrieval](retrieval.md).
+
+### Rejected resolution strategies
+
+- **Eager resolution at write time** (storing `dst_chunk_id` directly). Forces re-resolve on every sync that touches a referenced symbol; breaks under renames; and forces all plugins to participate in a single symbol-id arena before any of them can write edges.
+- **A separate post-pass that resolves edges after the indexer completes.** Doubles the index-build time for marginal query-time gain; the resolution cost is amortized across queries that actually need it.
+
 ## Schema versioning
 
 - `meta.schema_version` is written at index creation.
 - On every open, storage checks the running engine's expected version. Mismatch is **loud**: refuse to query and prompt for `codedoc index rebuild` or a documented migration.
-- Migrations are forward-only and live in `codedoc.storage.migrations.<from>_to_<to>.py`.
+- Migrations are forward-only and live in `code_doc_cli.storage.migrations.<from>_to_<to>.py`.
 - The version is bumped on any schema-affecting change, however small. Silent drift is the failure mode we are paying overhead to prevent.
 
 ## Embedding storage
 
 - `embeddings` table dimension matches the **embedding model**, not the project config. Switching models means rebuild (or re-embed with conversion).
 - `meta.embed_model` records which model produced the current embeddings. Mismatch with config is loud.
-- `chunks.content_hash` enables a future embedding cache so unchanged chunks skip re-embed across rebuilds.
+
+An embedding cache keyed by chunk content hash is **deferred** (see [mvp-scope](mvp-scope.md)). The supporting `chunks.content_hash` column lands together with the cache feature via a schema bump, not as a dormant column.
 
 ## Concurrency
 
 - WAL mode is enabled at connection setup.
 - Indexer takes a single write connection; readers (search, symbols, graph) use separate read connections.
 - No long-running transactions in readers.
+
+Readers see a **SQLite snapshot pinned at connection time**: a reader observes a consistent view of the database as of the moment it opened its connection, and concurrent writes by an indexer or `index sync` are invisible until that reader closes and reopens. Long-running agent loops (planner-explorer iterations, multi-phase doc generation) that want to pick up newer index state must reopen between phases; the CLI exits between invocations, so an agent that issues one `codedoc` call per query already gets fresh state naturally. This is what makes determinism affordable in practice — a single planner-explorer iteration sees one consistent index even if a `codedoc index sync` is racing in the background, and there is no read-side coordination cost for the common case. See [docs-generation-pipeline](docs-generation-pipeline.md) for why this matters to the consumer.
 
 ## Implications
 
@@ -101,5 +122,4 @@ Indices on `chunks(path)`, `chunks(language)`, `symbols(name)`, `edges(dst_name)
 
 ## Open questions
 
-- Whether to also persist a `files` table separately from `chunks` for fast "list files" queries, or derive from `chunks` via DISTINCT. Likely needed for graph/symbol indices to be efficient.
-- Whether to vacuum on a schedule or after sync above a threshold of deletes. Deferred to implementation.
+None pinned here. A separate `files` table and vacuum scheduling were demoted to [roadmap](roadmap.md).

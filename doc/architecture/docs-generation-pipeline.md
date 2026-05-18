@@ -30,7 +30,7 @@ Meta-orchestrator (Opus, very thin)
   |           +-- writers cite via codedoc-returned file:line
   |
   +-- Cross-language seam pass:
-  |     +-- dedicated Opus pass over codedoc.graph + codedoc.symbols
+  |     +-- dedicated Opus pass over code_doc_cli.graph + code_doc_cli.symbols
   |     +-- documents producer/consumer pairs across F#/TS/LSL boundaries
   |
   +-- Stitch + review (Opus)
@@ -83,5 +83,4 @@ The pipeline benefits from prompt caching when codedoc returns *stable* results 
 
 ## Open questions
 
-- Whether to expose a `codedoc seams` subcommand that returns producer/consumer pairs directly (saving the consumer from composing graph + symbols + search). Plausible; not MVP — wait until the seam pass design has run end-to-end and shown what shape it actually needs.
-- Whether the pipeline benefits from a `codedoc search --explain` mode for debugging which retrieval source contributed which chunk. Cheap to add; defer until needed.
+None pinned here. A `codedoc seams` engine subcommand was demoted to [roadmap](roadmap.md); the `codedoc search --explain` item is tracked in the same place under [cli](cli.md).

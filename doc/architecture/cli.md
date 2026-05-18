@@ -75,6 +75,8 @@ codedoc symbols refs <name>           # references
                      [--format text|json]
 ```
 
+Matching is **substring on `name` by default, case-sensitive**. `--exact` switches to exact-match. `--lang <name>` narrows to one language's symbols. Results include the `scope` field for disambiguation; agents that need a fully-qualified handle can concatenate `lang:scope:name`. The `name` strings themselves are plugin-emitted and not normalized by the engine — see [chunking-and-languages](chunking-and-languages.md), "Symbol identity", for the per-language conventions.
+
 ### `codedoc graph`
 
 Lightweight dep / call queries over the edges table.
@@ -82,10 +84,11 @@ Lightweight dep / call queries over the edges table.
 ```
 codedoc graph callers <symbol>        # who points at this
 codedoc graph deps <path>             # what this file/chunk depends on
-                   [--depth <int>]    # transitive, default 1
                    [--lang <name>]
                    [--format text|json]
 ```
+
+Graph subcommands accept the same `--lang` filter as `symbols`, and the `<symbol>` argument to `graph callers` follows the same substring-by-default, `--exact`-for-exact, case-sensitive rule (see [chunking-and-languages](chunking-and-languages.md), "Symbol identity").
 
 ### `codedoc config show`
 
@@ -97,11 +100,9 @@ codedoc config show [--format text|json]
 
 ### `codedoc doctor`
 
-Diagnoses common problems: missing extension, schema mismatch, model mismatch, stale index, missing API key for the configured backend.
+Intended to diagnose common problems in one place: missing extension, schema mismatch, model mismatch, stale index, missing API key for the configured backend.
 
-```
-codedoc doctor
-```
+**Deferred to v1.1** (see [mvp-scope](mvp-scope.md)). Until it ships, each subcommand emits the relevant failure inline using the codes and `kind` strings defined in [errors-and-exit-codes](errors-and-exit-codes.md).
 
 ## Cross-cutting behaviors
 
@@ -121,12 +122,19 @@ codedoc doctor
 - `--verbose` adds timings, candidate pool sizes, and the fused score per result.
 - `--quiet` suppresses progress reporting (useful in pipelines).
 
+## Output streams and logging
+
+- **stdout** carries command results only. In human format that is one result per stanza as described under [Output discipline](#output-discipline); under `--format json` it is exactly one JSON document covering the whole result, or one error envelope on failure (see [errors-and-exit-codes](errors-and-exit-codes.md)).
+- **stderr** carries human-readable logs, warnings, and progress reporting. It never carries command results. The format is plain text — there is no structured stderr in MVP.
+- **Log levels** are intentionally minimal: progress and warnings at the default level, plus debug timings and candidate-pool sizes under `--verbose`. There is no separate `--log-level` flag; `--verbose` is the single knob.
+- **`--quiet`** suppresses only the stderr progress lines (per-file walk lines, "encoded N batches" lines). Warnings and errors still print to stderr, and `--quiet` does **not** change the shape of stdout.
+- Failure shapes — both the stderr summary and the stdout JSON envelope under `--format json` — are specified in [errors-and-exit-codes](errors-and-exit-codes.md).
+
 ## Implications
 
-- Adding a subcommand is a code change in `codedoc.cli`. Flag changes within a subcommand are minor; argument removal is breaking.
+- Adding a subcommand is a code change in `code_doc_cli.cli`. Flag changes within a subcommand are minor; argument removal is breaking.
 - The CLI is the integration point for the doc-gen pipeline — see `docs-generation-pipeline.md`.
 
 ## Open questions
 
-- Whether to add a `codedoc watch` daemon mode for live indices. Plausible v1.x; not MVP.
-- Whether `codedoc search --explain` should dump the per-source contributions for diagnostics. Likely yes; cheap.
+None pinned here. `codedoc watch` and `codedoc search --explain` were demoted to [roadmap](roadmap.md).

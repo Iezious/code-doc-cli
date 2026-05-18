@@ -31,6 +31,11 @@ Cross-link between files where decisions interact. Treat the architecture docs a
 - `cli.md` — command surface
 - `tool-and-data-split.md` — global engine vs per-project config and data
 - `docs-generation-pipeline.md` — how `codedoc` is used by the doc-gen pipeline
+- `mvp-scope.md` — single source of truth for what ships in the MVP and what is cut
+- `config.md` — full `config.toml` schema, defaults, and validation rules
+- `errors-and-exit-codes.md` — CLI failure-mode contract (exit codes, `kind` strings, JSON envelope)
+- `roadmap.md` — v1.1+ items demoted from architecture open-question lists, with pointers back to source docs
+- `mvp-phases.md` — seven-phase implementation delivery sequence for the MVP, with per-phase Definitions of Done
 
 When adding a new architecture concern, prefer a new file over a section in an existing one — files are easier to link to and easier to deprecate.
 
