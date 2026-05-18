@@ -2,14 +2,14 @@
 
 ## Decision
 
-The MVP is built in **seven sequential phases**, foundations-first. Each phase corresponds to one future `/planner` invocation that produces a `doc/plans/<NNN>.<feature>/` folder. Phases are sequential — every phase depends on artifacts from earlier ones — but steps *within* a phase may be planned and dispatched in parallel where the planner judges it safe (notably the seven independent language plugins in Phase 3).
+The MVP is built in **seven sequential phases**, foundations-first. Each phase corresponds to one future `/planner` invocation that produces a `docs/plans/<NNN>.<feature>/` folder. Phases are sequential — every phase depends on artifacts from earlier ones — but steps *within* a phase may be planned and dispatched in parallel where the planner judges it safe (notably the seven independent language plugins in Phase 3).
 
-This doc records *how the MVP gets built*. It introduces no new design decisions; it sequences the ones already pinned in [mvp-scope](mvp-scope.md) and the rest of `doc/architecture/`.
+This doc records *how the MVP gets built*. It introduces no new design decisions; it sequences the ones already pinned in [mvp-scope](mvp-scope.md) and the rest of `docs/architecture/`.
 
 ## Rationale
 
 - **Foundations first** keeps the dependency direction clean. Storage, config, and errors are infrastructure every later phase consumes; getting them wrong is expensive once features pile on top.
-- **One phase = one planner invocation** keeps the planning loop honest. Each phase has a single owner, a single review cycle, and a single status file under `doc/plans/`.
+- **One phase = one planner invocation** keeps the planning loop honest. Each phase has a single owner, a single review cycle, and a single status file under `docs/plans/`.
 - **The phase boundary is the integration test boundary.** Each phase ends in a runnable Definition of Done that exercises the phase end-to-end against earlier phases' artifacts. Foundation drift surfaces at the next phase boundary instead of at the end of MVP.
 
 ## Rejected alternatives
@@ -104,7 +104,7 @@ This doc records *how the MVP gets built*. It introduces no new design decisions
 
 ## How `/planner` consumes this
 
-- Each phase corresponds to one `/planner` invocation. The phase name becomes the feature name in `doc/plans/<NNN>.<feature>/`.
+- Each phase corresponds to one `/planner` invocation. The phase name becomes the feature name in `docs/plans/<NNN>.<feature>/`.
 - The `/planner` pass should treat `mvp-phases.md` plus the architecture docs the phase exercises as its primary inputs.
 - Step granularity within a phase is the planner's call; the phase DoD is the contract.
 - A phase is finalized (per the architect skill's finalization workflow) only after the DoD passes.

@@ -14,7 +14,7 @@ For large polyglot codebases, asking Claude agents to read raw source for every 
 
 ## Status
 
-Design phase. Implementation begins in a separate session. See `doc/architecture/` for the decisions, `doc/plans/` for the work plans, and `doc/CLAUDE.md` for the documentation layout.
+Design phase. Implementation begins in a separate session. See `docs/architecture/` for the decisions, `docs/plans/` for the work plans, and `docs/CLAUDE.md` for the documentation layout.
 
 ## Install
 
@@ -67,4 +67,4 @@ codedoc symbols defs Foo
 codedoc graph callers Bar
 ```
 
-See `doc/architecture/cli.md` for the full command surface.
+See `docs/architecture/cli.md` for the full command surface.

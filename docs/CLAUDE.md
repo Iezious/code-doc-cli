@@ -1,14 +1,14 @@
-# `doc/` layout
+# `docs/` layout
 
 This directory is the project's documentation. It has two subtrees, each with a distinct purpose:
 
 ```
-doc/
+docs/
   architecture/   # design decisions, one file per concern
   plans/          # work plans, one file per task
 ```
 
-## `doc/architecture/`
+## `docs/architecture/`
 
 Captures **decisions**, not implementation details. Each file owns a single concern and follows a consistent shape:
 
@@ -39,7 +39,7 @@ Cross-link between files where decisions interact. Treat the architecture docs a
 
 When adding a new architecture concern, prefer a new file over a section in an existing one — files are easier to link to and easier to deprecate.
 
-## `doc/plans/`
+## `docs/plans/`
 
 One file per work plan. Filename format: `YYYY-MM-DD.short-name.md` (e.g. `2026-05-13.initial-mvp.md`).
 

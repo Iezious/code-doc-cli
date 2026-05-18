@@ -4,10 +4,10 @@
 
 ## Read first
 
-- `doc/CLAUDE.md` — layout of the `doc/` tree and conventions
-- `doc/architecture/overview.md` — what this tool is and why
-- `doc/architecture/architecture.md` — components and data flow
-- `doc/plans/` — current and past work plans, one file per task
+- `docs/CLAUDE.md` — layout of the `docs/` tree and conventions
+- `docs/architecture/overview.md` — what this tool is and why
+- `docs/architecture/architecture.md` — components and data flow
+- `docs/plans/` — current and past work plans, one file per task
 
 The architecture docs are the source of truth for design decisions. Don't add code that contradicts them without updating the doc in the same change.
 
@@ -16,7 +16,7 @@ The architecture docs are the source of truth for design decisions. Don't add co
 - Implementation lives under `src/code_doc_cli/` once the build session begins. The tree is currently code-free by design.
 - Use `uv` for everything Python: `uv tool install --editable .` for install, `uv sync` for dev, `.venv/Scripts/python` to run scripts.
 - Path conventions: forward slashes, uppercase Windows drive letters, quoted paths with spaces.
-- Don't introduce languages, embedding backends, or storage choices not covered in `doc/architecture/`. If you need to, write the decision doc first.
+- Don't introduce languages, embedding backends, or storage choices not covered in `docs/architecture/`. If you need to, write the decision doc first.
 
 ## Scope discipline
 
@@ -26,6 +26,6 @@ The architecture docs are the source of truth for design decisions. Don't add co
 
 ## When working on this project
 
-- Architecture decisions go in `doc/architecture/`. New decisions get a new file or extend an existing one with a dated note.
-- Task plans go in `doc/plans/<YYYY-MM-DD>.<short-name>.md`.
+- Architecture decisions go in `docs/architecture/`. New decisions get a new file or extend an existing one with a dated note.
+- Task plans go in `docs/plans/<YYYY-MM-DD>.<short-name>.md`.
 - Keep architecture docs concise: state the decision, name what was rejected, list implications. Avoid speculative future-scope writing.

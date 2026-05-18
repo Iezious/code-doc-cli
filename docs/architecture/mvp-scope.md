@@ -8,7 +8,7 @@ If a feature is not listed in either column below, treat it as **implicitly out 
 
 ## Rationale
 
-A pinned cut line keeps the first round of plans under `doc/plans/` honest. Without it, scope drifts feature by feature and "MVP" becomes a moving target. Naming what is cut, and why, is just as load-bearing as naming what is in — it prevents accidental re-litigation in every plan.
+A pinned cut line keeps the first round of plans under `docs/plans/` honest. Without it, scope drifts feature by feature and "MVP" becomes a moving target. Naming what is cut, and why, is just as load-bearing as naming what is in — it prevents accidental re-litigation in every plan.
 
 ## In scope for MVP
 
@@ -123,7 +123,7 @@ Already noted as a future enhancement in [embeddings](embeddings.md). MVP uses `
 
 ## Implications
 
-- The first planner pass under `doc/plans/` reads this file before anything else.
+- The first planner pass under `docs/plans/` reads this file before anything else.
 - Any later doc that says "MVP X" must not contradict the lists above. If it would, this file is the one to update — the contradiction is the bug.
 - Cuts that name a v1.1 target are commitments to revisit, not promises to ship.
 
