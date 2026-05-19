@@ -34,8 +34,8 @@ Exit codes are part of the CLI contract and are stable across minor versions. Th
 | `11` | index/model | Stored `embed_dim` or `embed_model` does not match the configured backend. |
 | `12` | index/missing | No `docs/.helpers/` discovered when one was required. |
 | `20` | backend | Generic embedding backend failure (model download failed, encode crashed). |
-| `21` | backend/auth | Voyage `VOYAGE_API_KEY` missing or rejected. |
-| `22` | backend/rate-limit | Voyage HTTP 429 after retries exhausted. |
+| `21` | backend/auth | Reserved for future API-backend authentication failures (e.g., missing or rejected credentials). No producer in MVP. |
+| `22` | backend/rate-limit | Reserved for future API-backend rate-limit failures (e.g., HTTP 429 after retries exhausted). No producer in MVP. |
 | `30` | parsing/plugin | A language plugin raised on a file. In default mode the file is skipped and the command still succeeds; this code is emitted only under `--strict`. |
 | `40` | io | Read permission denied, or encoding decode failure with no fallback. |
 | `41` | io/oversize | File exceeds the max-file-size limit, in `--strict` mode. |
@@ -105,8 +105,8 @@ See [embeddings](embeddings.md) and [storage](storage.md).
 
 - fastembed model download failed → `backend.model_download_failed` (code 20).
 - Backend `encode` raised → `backend.encode_failed` (code 20).
-- Voyage API auth failure (missing key, key rejected) → `backend.auth_failed` (code 21).
-- Voyage rate-limit / 429 after retries exhausted → `backend.rate_limited` (code 22).
+- Reserved for future API-backend authentication failures → `backend.auth_failed` (code 21). MVP has no producer for this kind; the contract is reserved so future paid backends can adopt this code without renumbering.
+- Reserved for future API-backend rate-limit failures → `backend.rate_limited` (code 22). MVP has no producer for this kind; the contract is reserved so future paid backends can adopt this code without renumbering.
 
 See [embeddings](embeddings.md) for backend behavior.
 

@@ -32,11 +32,10 @@ code_index index build [--root <path>]   # override config roots
 
 ### `code_index index sync`
 
-Incremental update. Uses `git diff` against `meta.last_commit` when available, falling back to mtime/hash comparison.
+Incremental update. For each project file, compares mtime and size against the `files` table (see [storage](storage.md)). Re-chunks and re-embeds files whose mtime or size has changed; inserts new files; deletes rows for files that have vanished from the tree. Does not depend on git.
 
 ```
-code_index index sync [--since <ref>]    # explicit base
-                   [--verbose]
+code_index index sync [--verbose]
 ```
 
 ### `code_index index rebuild`
@@ -92,7 +91,7 @@ Graph subcommands accept the same `--lang` filter as `symbols`, and the `<symbol
 
 ### `code_index config show`
 
-Prints the resolved configuration (config file values merged with defaults) and the index metadata (schema version, embed model, last commit). Useful for "is my index up to date with my config?" checks.
+Prints the resolved configuration (config file values merged with defaults) and the index metadata (schema version, embed model). Useful for "is my index up to date with my config?" checks.
 
 ```
 code_index config show [--format text|json]

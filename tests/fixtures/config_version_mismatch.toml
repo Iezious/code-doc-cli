@@ -1,0 +1,3 @@
+# exercises config.version_mismatch — pin no current engine version satisfies
+[code_index]
+version = ">=99.0"

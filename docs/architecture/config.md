@@ -17,7 +17,7 @@ This doc owns the schema. Loader internals belong in the implementation; rationa
 - **JSON.** No comments. Painful for a file humans hand-edit.
 - **YAML.** Multiple dialects, indentation-sensitive, surprising type coercions.
 - **`pyproject.toml` `[tool.code_index]` section.** Couples the index config to the *consuming* project's Python packaging, which is wrong for polyglot projects that may not have a `pyproject.toml` at all.
-- **Environment-variable overrides for behavior keys.** Hidden state that breaks reproducibility. Env vars are reserved for *secrets* (`VOYAGE_API_KEY`), not behavior.
+- **Environment-variable overrides for behavior keys.** Hidden state that breaks reproducibility. Env vars are reserved for *secrets* (e.g. backend credentials), not behavior.
 
 ## Schema
 
@@ -31,8 +31,8 @@ All keys are under `[code_index]`. Types are TOML types; "list of X" means a TOM
 | `ignores` | list of glob strings | no | `[]` | Extra ignore patterns, merged with `.gitignore` and the engine's built-in default excludes. |
 | `languages` | list of language name strings | no | all seven built-ins | Active language plugins by name (`"fsharp"`, `"csharp"`, `"javascript"`, `"typescript"`, `"go"`, `"python"`, `"lsl"`). A subset disables unlisted built-ins. |
 | `extra_languages` | list of relative path strings | no | `[]` | Paths to Python module files providing additional language plugins. Loaded as ordinary Python modules into the plugin registry. |
-| `embed_backend` | enum string: `"fastembed"` \| `"voyage"` | no | `"fastembed"` | Which embedding backend to use. |
-| `embed_model` | string | no | `"jinaai/jina-embeddings-v2-base-code"` when `embed_backend = "fastembed"`; `"voyage-code-3"` when `embed_backend = "voyage"` | Model identifier. Backend-specific; the loader picks the right default from the active backend. |
+| `embed_backend` | enum string: `Literal["fastembed"]` | no | `"fastembed"` | Which embedding backend to use. `Literal` framing is kept for forward extensibility; additional backends are roadmap items (see [embeddings](embeddings.md)). |
+| `embed_model` | string | no | `"jinaai/jina-embeddings-v2-base-code"` when `embed_backend = "fastembed"` | Model identifier. Backend-specific; the loader picks the right default from the active backend. |
 | `embed_batch_size` | int | no | `32` | Batch size passed to the backend's `encode` call. Tunable per project. |
 
 ### Example
@@ -53,7 +53,7 @@ embed_batch_size = 32
 ## Validation rules
 
 - `version` must parse as a PEP 440 specifier. The current engine version must satisfy it; otherwise loud failure (see [errors-and-exit-codes](errors-and-exit-codes.md), code `2`).
-- `embed_backend` must be one of the allowed values (`"fastembed"`, `"voyage"`).
+- `embed_backend` must be `"fastembed"` — the only value accepted in MVP. The check still produces `config.bad_enum` on any other value; the `Literal` framing leaves room for additional values in future versions without renumbering errors.
 - `embed_model` must be compatible with the chosen backend (backend reports its accepted models; mismatch is loud failure).
 - `roots` paths must exist and resolve under the project root.
 - `extra_languages` paths must exist and be readable Python files.

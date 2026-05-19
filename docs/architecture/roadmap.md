@@ -8,12 +8,6 @@ In-scope MVP items do **not** belong here, even if they were once open questions
 
 ## Index storage and maintenance
 
-### Separate `files` table
-
-- Source: [storage](storage.md).
-- Why deferred: MVP derives the file list via `SELECT DISTINCT path FROM chunks` and lives with the cost; a separate table is likely needed once graph/symbol indices grow large enough for the distinct scan to matter.
-- What unlocks it: measurements showing the distinct-scan cost is a real bottleneck on a representative index.
-
 ### Vacuum scheduling
 
 - Source: [storage](storage.md).
@@ -65,6 +59,12 @@ In-scope MVP items do **not** belong here, even if they were once open questions
 - What unlocks it: a stable seam-pass implementation that has converged on a producer/consumer query shape worth promoting into the engine.
 
 ## Embedding ecosystem
+
+### Voyage code-3 backend
+
+- Source: [embeddings](embeddings.md) (extension point), [mvp-scope](mvp-scope.md) (Update 2026-05-19).
+- Why deferred: MVP is single-user, local, CPU-only. Voyage requires an account, an API key, network egress, and per-call billing; nothing in MVP justifies that operational and onboarding friction. The `EmbeddingBackend` Protocol makes Voyage a future-additive change.
+- What unlocks it: a concrete user need for higher-quality / paid embeddings, or a use case where local CPU embeddings are inadequate. When implemented, ships behind a `[voyage]` install extra and is gated by `VOYAGE_API_KEY`; reuses the reserved exit codes `21` (`backend.auth_failed`) and `22` (`backend.rate_limited`).
 
 ### Benchmark harness
 

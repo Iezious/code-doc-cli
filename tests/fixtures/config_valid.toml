@@ -1,0 +1,11 @@
+# valid config — passes load_config when engine_version satisfies the pin
+[code_index]
+version          = ">=0.1,<1.0"
+project          = "demo"
+roots            = ["."]
+ignores          = ["**/snapshots/**"]
+languages        = ["python", "typescript"]
+extra_languages  = []
+embed_backend    = "fastembed"
+embed_model      = "jinaai/jina-embeddings-v2-base-code"
+embed_batch_size = 16

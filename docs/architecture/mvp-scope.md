@@ -18,8 +18,7 @@ All seven languages on day one: F#, C#, JavaScript, TypeScript, Go, Python, LSL.
 
 ### Embedding backends
 
-- Default: `fastembed` with Jina v2 base code (768-dim, CPU, offline-capable).
-- Opt-in extra: Voyage `code-3`, installed via the `[voyage]` install extra and gated by `VOYAGE_API_KEY`.
+- `fastembed` with Jina v2 base code (768-dim, CPU, offline-capable). Single backend in MVP; the `EmbeddingBackend` Protocol is preserved as the extension point for future backends.
 
 See [embeddings](embeddings.md).
 
@@ -130,3 +129,36 @@ Already noted as a future enhancement in [embeddings](embeddings.md). MVP uses `
 ## Open questions
 
 None for the cut line itself. Items deferred above carry their own open questions in their owning docs and will be triaged in a later open-questions sweep.
+
+### Update 2026-05-19 — Voyage demoted to roadmap
+
+The Voyage `code-3` embedding backend is removed from MVP scope and promoted to [roadmap](roadmap.md). This was decided before Phase 7 (the phase that would have implemented Voyage) was planned, so the change is a scope reduction rather than a reversal.
+
+**Decision summary**
+
+- The MVP ships **one** embedding backend: `fastembed` (Jina v2 base code, 768-dim, CPU).
+- The `EmbeddingBackend` Protocol stays as the documented extension point — single implementation in MVP, but the contract is preserved so additional backends can be added without re-architecting.
+- Voyage moves to [roadmap](roadmap.md) as a new entry under `## Embedding ecosystem`.
+- Exit codes `21` (`backend.auth_failed`) and `22` (`backend.rate_limited`) **stay in the error table** but are rephrased as reserved for future API-backend integrations. No producer in MVP. This preserves the spacing-as-design narrative in [errors-and-exit-codes](errors-and-exit-codes.md).
+- Phase 7 keeps its slot but drops Voyage scope; the heading is renamed from "Voyage, `config show`, JSON polish" to "`config show`, JSON polish".
+
+**Rationale**
+
+- Single-user, single-project tool. The free, local `fastembed` backend covers every documented MVP use case at acceptable quality on CPU.
+- Voyage requires an account, an API key, network egress, and per-call billing — all of which add operational and onboarding friction that nothing in the MVP scope justifies.
+- The `EmbeddingBackend` Protocol already makes Voyage a future-additive change rather than a re-architecture, so deferring costs nothing structurally.
+
+**Rejected alternatives**
+
+- **Keep Voyage in Phase 7 but mark it experimental.** Adds an "experimental" flag concept the project does not otherwise use; does not actually reduce surface area until users opt out.
+- **Remove the `EmbeddingBackend` Protocol entirely and hard-code `FastembedBackend`.** Saves a layer of indirection but burns the extension point. Re-adding it later would mean re-architecting every call site that imports the concrete class.
+- **Retire exit codes 21 and 22.** Cleaner short-term but means renumbering when Voyage returns. Rejected in favor of reserved-as-gap framing.
+
+**What this changed in the docs**
+
+- [mvp-phases](mvp-phases.md) — Phase 1 no longer declares the `[voyage]` install extra; Phase 2's "Note on Voyage" is removed; Phase 7 heading renamed and Voyage bullets dropped from its Delivers, Exercises, and DoD lists.
+- [embeddings](embeddings.md) — Voyage as opt-in alternative removed; comparative-with-Voyage paragraphs trimmed; TOML example, `VOYAGE_API_KEY` paragraph, and `[voyage]` install-extra sentence removed. The `EmbeddingBackend` Protocol is retained as the extension point and now points at [roadmap](roadmap.md) for additional backends.
+- [architecture](architecture.md) — Embeddings component bullet rewritten to name `fastembed` as the sole MVP implementation.
+- [config](config.md) — `embed_backend` enum collapsed to `Literal["fastembed"]`; the `embed_model` default map collapsed to the single `fastembed` entry; the `VOYAGE_API_KEY` env-var example dropped; `embed_backend` validation message updated.
+- [errors-and-exit-codes](errors-and-exit-codes.md) — rows for codes `21` and `22` rephrased as reserved for future API-backend integrations; the `Embedding backend (codes 20, 21, 22)` enumerated-failure entries rewritten in the same framing, with `kind` strings preserved as registered-but-unused.
+- [roadmap](roadmap.md) — new entry "Voyage code-3 backend" added under `## Embedding ecosystem`.

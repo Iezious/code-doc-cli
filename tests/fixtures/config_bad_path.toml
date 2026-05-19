@@ -1,0 +1,4 @@
+# exercises config.bad_path — roots entry that does not exist on disk
+[code_index]
+version = ">=0.1,<1.0"
+roots   = ["./does-not-exist"]

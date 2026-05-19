@@ -24,7 +24,7 @@ This doc records *how the MVP gets built*. It introduces no new design decisions
 
 - **Delivers:**
   - Python package skeleton under `src/code_index/` (per project root `CLAUDE.md`).
-  - `pyproject.toml` set up for `uv tool install --editable .`, with the `[voyage]` install extra declared now even though the Voyage backend itself ships in Phase 7.
+  - `pyproject.toml` set up for `uv tool install --editable .`.
   - Storage layer: SQLite open helper, `sqlite-vec` extension load, FTS5 availability check, schema creation, `meta` table with `schema_version` written at create time, and a forward-only file-per-step migrations harness skeleton.
   - Config loader: TOML parse, full validation per [config](config.md), version-pin check, mapping of every failure to the correct `code` / `kind` from [errors-and-exit-codes](errors-and-exit-codes.md).
   - Errors infrastructure: exit-code constants, `kind` string registry, JSON envelope writer, stderr formatting helpers, and stream-discipline helpers ensuring stdout-results vs stderr-logs separation per [cli](cli.md).
@@ -43,7 +43,6 @@ This doc records *how the MVP gets built*. It introduces no new design decisions
 - **Depends on:** Phase 1.
 - **Exercises:** [embeddings](embeddings.md).
 - **DoD:** a unit test calls `backend.encode(["foo", "bar"])` and gets back an `ndarray` of shape `(2, 768)` with `backend.dim == 768`; first-run model download caches under user home; second run reuses the cache.
-- **Note on Voyage:** the Voyage backend ships in Phase 7, not here. Phase 2 declares the protocol but only implements `fastembed`.
 
 ### Phase 3 — Plugin interface and seven languages
 
@@ -84,7 +83,7 @@ This doc records *how the MVP gets built*. It introduces no new design decisions
 ### Phase 6 — Sync, symbols, graph, rebuild
 
 - **Delivers:**
-  - `code_index index sync` subcommand using `git diff --name-only <meta.last_commit>..HEAD`, with mtime fallback for non-git trees.
+  - `code_index index sync` subcommand using mtime+size comparison against the `files` table; no git dependency. The `files` table is part of schema v1 (created by `0_to_1.py`); Phase 6 reads it but does not ship a migration.
   - `code_index index rebuild` subcommand (drop + build, gated by `--yes`).
   - `code_index symbols defs|refs` per [cli](cli.md) and the "Symbol identity" section of [chunking-and-languages](chunking-and-languages.md): substring by default, `--exact`, `--lang`, case-sensitive.
   - `code_index graph callers|deps` with lazy `dst_name`-to-`symbols.name` resolution per [storage](storage.md)'s "Edge resolution" section.
@@ -92,15 +91,14 @@ This doc records *how the MVP gets built*. It introduces no new design decisions
 - **Exercises:** [cli](cli.md) (sync, rebuild, symbols, graph), [storage](storage.md) (edge resolution), [chunking-and-languages](chunking-and-languages.md) (symbol identity).
 - **DoD:** edit one fixture file, run `code_index index sync`, verify only that file's rows changed; `code_index symbols defs <name>` returns expected hits with the right `scope`; `code_index graph callers <symbol>` returns the expected source chunks; `code_index graph deps <path>` returns expected target names, including any unresolved ones (the contract allows them).
 
-### Phase 7 — Voyage, `config show`, JSON polish
+### Phase 7 — `config show`, JSON polish
 
 - **Delivers:**
-  - Voyage `code-3` backend behind the `[voyage]` install extra, gated by `VOYAGE_API_KEY` per [embeddings](embeddings.md).
-  - `code_index config show` subcommand: prints resolved config + index meta (schema_version, embed_model, last_commit) per [cli](cli.md). The Phase 1 stub is replaced with the full implementation here.
+  - `code_index config show` subcommand: prints resolved config + index meta (schema_version, embed_model) per [cli](cli.md). The Phase 1 stub is replaced with the full implementation here.
   - `--format json` final pass: every subcommand returns a stable JSON shape on stdout for success and the error envelope from [errors-and-exit-codes](errors-and-exit-codes.md) on failure. The shape is documented inline per subcommand.
 - **Depends on:** Phases 1–6.
-- **Exercises:** [embeddings](embeddings.md) (Voyage), [cli](cli.md) (config show), [errors-and-exit-codes](errors-and-exit-codes.md) (JSON envelope), [config](config.md).
-- **DoD:** every MVP subcommand under `--format json` round-trips through `json.loads`; the same subcommands under failure conditions emit a parseable error envelope; with `VOYAGE_API_KEY` set, a smoke test against `voyage-code-3` returns a vector of the correct dim; without the key, the backend fails fast at init with `kind = "backend.auth_failed"` (code 21).
+- **Exercises:** [cli](cli.md) (config show), [errors-and-exit-codes](errors-and-exit-codes.md) (JSON envelope), [config](config.md).
+- **DoD:** every MVP subcommand under `--format json` round-trips through `json.loads`; the same subcommands under failure conditions emit a parseable error envelope.
 
 ## How `/planner` consumes this
 

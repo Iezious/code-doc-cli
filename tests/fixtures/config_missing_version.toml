@@ -1,0 +1,3 @@
+# exercises config.missing_key — no 'version' key under [code_index]
+[code_index]
+project = "demo"

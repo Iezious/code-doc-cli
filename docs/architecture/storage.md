@@ -33,7 +33,14 @@ meta(
   key TEXT PRIMARY KEY,
   value TEXT
 )
--- holds: schema_version, code_index_version, last_commit, embed_model, embed_dim
+-- holds: schema_version, code_index_version, embed_model, embed_dim
+
+files(
+  path TEXT PRIMARY KEY,
+  mtime REAL,    -- seconds since epoch, as returned by os.stat().st_mtime
+  size INTEGER   -- bytes
+)
+-- tracks per-file index state for incremental sync.
 
 chunks(
   id INTEGER PRIMARY KEY,
@@ -106,6 +113,12 @@ Consequences:
 
 An embedding cache keyed by chunk content hash is **deferred** (see [mvp-scope](mvp-scope.md)). The supporting `chunks.content_hash` column lands together with the cache feature via a schema bump, not as a dormant column.
 
+## Sync state
+
+The `files` table is the source of truth for "what we have indexed and at what mtime/size". `index build` populates it as each file is chunked and inserted; `index sync` joins the walked file set against it to decide what to re-embed, insert, or delete (see [architecture](architecture.md)'s "Sync" data-flow section). No git state is recorded — sync compares mtime and size only.
+
+The auto-rebuild drop path (`index build` against a populated index, or `index rebuild`) clears `files` along with `chunks` / `chunks_fts` / `embeddings` / `symbols` / `edges`.
+
 ## Concurrency
 
 - WAL mode is enabled at connection setup.
@@ -122,4 +135,29 @@ Readers see a **SQLite snapshot pinned at connection time**: a reader observes a
 
 ## Open questions
 
-None pinned here. A separate `files` table and vacuum scheduling were demoted to [roadmap](roadmap.md).
+None pinned here. Vacuum scheduling was demoted to [roadmap](roadmap.md).
+
+### Update 2026-05-19 — sync mechanism: mtime+size, files table
+
+Reversed the previously documented decision that `index sync` would use `git diff <meta.last_commit>..HEAD` with an mtime fallback for non-git trees. The new design uses a single code path: mtime+size comparison against a new `files(path, mtime, size)` table. `meta.last_commit` is removed from the schema and from all writers.
+
+Why:
+
+- `git diff <last_commit>..HEAD` misses uncommitted, staged, and untracked edits. Being correct with git would require chaining three git calls (`<last>..HEAD`, `HEAD` working-tree diff, `ls-files --others --exclude-standard`) plus handling detached HEAD and in-progress rebases/merges. That is two code paths' worth of complexity for a marginal perf win.
+- mtime+size catches all the cases uniformly in one code path. The `stat()` cost is tens of milliseconds for the project sizes this tool targets (single-project polyglot trees, typically <50k files).
+- A `files` table was already going to be needed for the non-git fallback. Once it exists, git stops earning its keep.
+- The previously open question "Whether sync should also fall back to file hash comparison" is resolved: deferred to v1.1 via the `chunks.content_hash` + embedding-cache roadmap item. mtime+size is the MVP comparator.
+
+Rejected alternatives:
+
+- **Keep git, fix the correctness gap.** Two code paths to maintain forever; multiple git subprocess calls per sync; multiple edge cases. Rejected for complexity vs marginal benefit at the scale this tool targets.
+- **Hybrid: git for candidate set, mtime to verify.** Best perf on huge trees, but worst code complexity. Still needs the `files` table. Rejected because the perf win does not justify two code paths at our scale.
+
+What this changed in the docs:
+
+- Schema sketch above: dropped `last_commit` from the `meta` comment; added the `files` table.
+- New "Sync state" subsection above.
+- [architecture](architecture.md): "Sync" component bullet and "Sync" data-flow section rewritten; the related open question removed.
+- [cli](cli.md): `index sync` prose and synopsis rewritten (no `--since`); `config show` reference to `last_commit` removed.
+- [mvp-phases](mvp-phases.md): Phase 6 `index sync` deliverable rewritten. Phase 7 `config show` deliverable no longer lists `last_commit`.
+- [roadmap](roadmap.md): "Separate `files` table" entry removed — the table is now MVP, landing in Phase 6.

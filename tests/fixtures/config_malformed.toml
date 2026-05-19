@@ -1,0 +1,3 @@
+# exercises config.parse_error — TOML syntax error (unterminated string)
+[code_index
+version = ">=0.1,<1.0

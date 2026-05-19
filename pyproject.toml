@@ -13,11 +13,13 @@ dependencies = [
     "tree-sitter>=0.23",
     "tree-sitter-language-pack>=0.4",
     "numpy>=1.26",
+    "pydantic>=2",
+    "packaging>=23",
 ]
 
 [project.optional-dependencies]
 voyage = ["voyageai>=0.2"]
-dev = ["pytest>=8", "ruff>=0.6"]
+dev = ["pytest>=8", "ruff>=0.6", "pyright>=1.1.350"]
 
 [project.scripts]
 code_index = "code_index.cli:app"
@@ -36,3 +38,11 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 ignore = ["E501"]
+
+[tool.pyright]
+include = ["src/code_index", "tests"]
+strict = ["src/code_index"]
+pythonVersion = "3.11"
+typeCheckingMode = "basic"
+extraPaths = ["src"]
+reportMissingImports = "warning"

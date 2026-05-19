@@ -2,7 +2,7 @@
 
 ## Decision
 
-Embeddings are produced by a pluggable backend. The default is **`fastembed`** with the code-tuned **Jina embeddings v2 base code** model (768-dim, runs locally on CPU). **Voyage `code-3`** is supported as an opt-in alternative via the `voyage` install extra.
+Embeddings are produced by a pluggable backend. The MVP ships **`fastembed`** with the code-tuned **Jina embeddings v2 base code** model (768-dim, runs locally on CPU) as the sole implementation.
 
 All backends conform to a single interface:
 
@@ -14,14 +14,15 @@ encode(texts: list[str]) -> ndarray of shape (N, D)
 
 ## Rationale
 
-- **Local default.** No API key, offline-capable, free reindexing — important when running across multiple projects iteratively.
-- **Code-tuned over general-purpose.** Jina v2 base code beats general models (OpenAI 3-small, BGE base) on code retrieval at comparable size. The retrieval quality gap to Voyage code-3 is real but narrows substantially under hybrid BM25 + dense fusion.
-- **Backend interface is small.** Switching is one config line plus a rebuild. Lock-in to the engine API, not the model.
+- **Local.** No API key, offline-capable, free reindexing — important when running across multiple projects iteratively.
+- **Code-tuned over general-purpose.** Jina v2 base code beats general models (OpenAI 3-small, BGE base) on code retrieval at comparable size.
+- **Deterministic and free.** A single-user, single-project tool has no justification for per-call billing or network egress on the hot indexing path.
+- **Backend interface is small.** The Protocol is preserved so additional backends can be added later without re-architecting the indexer or search path. Lock-in is to the engine API, not the model.
 
 ## Rejected alternatives
 
-- **OpenAI `text-embedding-3-large`.** Decent, but general-purpose. Code-tuned models of similar tier (Voyage code-3 / Jina code-v2) outperform it on code-specific benchmarks. If we are going to pay for an API, Voyage is the better spend.
-- **OpenAI `text-embedding-3-small` as default.** Weaker than Jina code-v2 on code, and not free. No reason to pick it.
+- **OpenAI `text-embedding-3-large`.** Decent, but general-purpose; code-tuned models of similar tier outperform it on code-specific benchmarks.
+- **OpenAI `text-embedding-3-small` as default.** Weaker than Jina code-v2 on code, and not free.
 - **Local sentence-transformers without fastembed.** Heavier dependency, slower startup, no ONNX quantization out of the box.
 - **Running our own embedding service.** Out of scope.
 - **Ensemble of two embedding models.** Rare; usually not worth the complexity. Rejected by default.
@@ -30,20 +31,20 @@ encode(texts: list[str]) -> ndarray of shape (N, D)
 
 ```python
 class EmbeddingBackend(Protocol):
-    name: str            # "fastembed:jina-code-v2", "voyage:code-3", ...
+    name: str            # e.g. "fastembed:jina-code-v2"
     dim: int             # vector dimension
     def encode(self, texts: list[str]) -> np.ndarray: ...
 ```
+
+The MVP ships one implementation of this Protocol (`fastembed`). The Protocol is the documented extension point — additional backends are roadmap items, tracked under `## Embedding ecosystem` in [roadmap](roadmap.md).
 
 Backends are instantiated from config:
 
 ```toml
 [code_index]
-embed_backend = "fastembed"           # or "voyage"
+embed_backend = "fastembed"
 embed_model   = "jinaai/jina-embeddings-v2-base-code"
 ```
-
-Voyage requires `VOYAGE_API_KEY` in the environment. Absence is detected at backend init, not deep in the indexer loop.
 
 ## Switching models
 
@@ -64,8 +65,7 @@ An embedding cache keyed by chunk content hash is **planned for v1.1 and not in 
 
 ## Implications
 
-- The default install is fully offline after the first model download (~120MB cached under user home).
-- Adding Voyage support is a `uv tool install --editable ".[voyage]"` opt-in.
+- The MVP install is fully offline after the first model download (~120MB cached under user home).
 - Embedding quality is **one axis** of retrieval quality; the other is BM25. See `retrieval.md` for how the two are fused.
 
 ## Open questions

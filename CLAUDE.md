@@ -29,3 +29,14 @@ The architecture docs are the source of truth for design decisions. Don't add co
 - Architecture decisions go in `docs/architecture/`. New decisions get a new file or extend an existing one with a dated note.
 - Task plans go in `docs/plans/<YYYY-MM-DD>.<short-name>.md`.
 - Keep architecture docs concise: state the decision, name what was rejected, list implications. Avoid speculative future-scope writing.
+
+## Build & Test Commands
+
+- Install (dev environment): `uv sync --extra dev`
+- Install (editable CLI): `uv tool install --editable .`
+- Tests: `uv run pytest`
+- Lint: `uv run ruff check`
+- Format: `uv run ruff format`
+- Typecheck: `uv run pyright` — note: `pyright` is added to the `[dev]` extras as part of Phase 1 (see `docs/architecture/mvp-phases.md`); this command becomes available after Phase 1 ships.
+
+Downstream agents (planner, coder, verifiers) read build/test/typecheck commands from this section.

@@ -1,0 +1,4 @@
+# exercises the unknown-key warning path (no raise, stderr warning only)
+[code_index]
+version       = ">=0.1,<1.0"
+mystery_key   = "should produce a warning, not a failure"

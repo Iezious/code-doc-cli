@@ -40,10 +40,10 @@
 - **Config** (`code_index.config`) — loads `docs/.helpers/config.toml`, validates against schema version pin, exposes resolved settings.
 - **Language plugins** (`code_index.languages.*`) — one module per language. Each implements `chunk`, `symbols`, and `imports`. Dispatch is by file extension. See `chunking-and-languages.md`.
 - **Chunker** (`code_index.chunker`) — thin dispatcher that picks the language plugin for a path and returns a normalized `Chunk` list.
-- **Embeddings** (`code_index.embeddings`) — backend interface with `fastembed` default and Voyage as an opt-in extra. See `embeddings.md`.
+- **Embeddings** (`code_index.embeddings`) — backend interface; the MVP ships `fastembed` as the sole implementation. See [embeddings](embeddings.md).
 - **Storage** (`code_index.storage`) — SQLite wrapper that owns connection lifecycle, loads the `sqlite-vec` extension, manages FTS5 tables, and runs schema migrations. See `storage.md`.
 - **Indexer** (`code_index.indexer`) — walks roots respecting config ignores, calls chunker, batches embeddings, inserts rows. Returns counts and timings.
-- **Sync** (`code_index.sync`) — git-aware incremental update. Diffs against the last indexed commit (or mtimes for non-git trees), re-embeds only changed chunks.
+- **Sync** (`code_index.sync`) — incremental update via mtime+size comparison against the `files` table. Re-embeds only changed files, inserts new ones, removes vanished ones.
 - **Search** (`code_index.search`) — runs FTS5 BM25 and `sqlite-vec` cosine queries in parallel, fuses with RRF, returns ranked chunks with `file:line`. See `retrieval.md`.
 - **Symbols** (`code_index.symbols`) — pure index lookup over the stored symbols table. `defs`, `refs`. Powered by what plugins emitted at index time; symbol queries are index-only for determinism.
 - **Graph** (`code_index.graph`) — queries the edges table for `callers`, `deps`. Per-language plugins decide what counts as an edge (imports, listen channels, etc.).
@@ -58,10 +58,12 @@
 5. Storage inserts: `chunks`, `chunks_fts`, `embeddings` (vec table), `symbols`, `edges`, updates `meta`.
 
 ### Sync
-1. Storage reads last-indexed commit hash from `meta`.
-2. Sync gets `git diff --name-only <last>..HEAD`. If not a git tree, falls back to mtime comparison.
-3. For each changed file: delete old rows, re-chunk, re-embed, re-insert.
-4. Update `meta.last_commit`.
+1. Walker enumerates current project files (same ignore rules as `index build`).
+2. For each walked file, compare mtime and size against the corresponding row in `files`:
+   - Match → no action.
+   - Differs → delete the file's existing rows from `chunks` / `chunks_fts` / `embeddings` / `symbols` / `edges`; re-chunk, re-embed, re-insert; update the `files` row.
+   - Absent → chunk, embed, insert; add a row to `files`.
+3. For each row in `files` whose path is not in the walked set, delete its rows from the five row-data tables and remove the `files` row.
 
 ### Search
 1. CLI parses query and filters (`--lang`, `--k`, `--project`, etc.).
@@ -119,4 +121,4 @@ The walker is the first stage of the indexer pipeline; it decides which files re
 
 ## Open questions
 
-- Whether `sync` should also fall back to file hash comparison (more robust than mtime) when git is absent. Likely yes; deferred to implementation.
+None pinned here.
