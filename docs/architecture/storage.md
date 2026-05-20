@@ -104,6 +104,7 @@ Consequences:
 - `meta.schema_version` is written at index creation.
 - On every open, storage checks the running engine's expected version. Mismatch is **loud**: refuse to query and prompt for `code_index index rebuild` or a documented migration.
 - Migrations are forward-only and live in `code_index.storage.migrations.<from>_to_<to>.py`.
+- Fresh schema creation flows through the same migrations harness: a from-scratch database starts at version `0` and applies `code_index.storage.migrations.0_to_1.py` (and any subsequent upgrade migrations) to reach the engine's expected version. There is no separate `CREATE TABLE` path.
 - The version is bumped on any schema-affecting change, however small. Silent drift is the failure mode we are paying overhead to prevent.
 
 ## Embedding storage

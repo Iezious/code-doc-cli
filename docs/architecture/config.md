@@ -88,6 +88,7 @@ The intent is that the file is small enough to read on first open and obvious en
 - Changing `embed_backend` or `embed_model` requires `code_index index rebuild`; the engine refuses queries against an index whose `meta.embed_model` does not match config (see [storage](storage.md) and [errors-and-exit-codes](errors-and-exit-codes.md)).
 - `extra_languages` is the supported extension point for project-specific DSLs. The engine stays free of per-project conditionals.
 - Because unknown keys only warn, a project pinned to a newer engine can be opened by an older engine without exploding — but the older engine cannot honor the unknown keys, so behavior will differ. The `version` pin is the guard against that.
+- Validation is implemented via Pydantic v2 models. New schema fields added to this doc must also be added to the `CodeIndexConfig` model in `src/code_index/config.py`; the model is the executable surface of this schema.
 
 ## Open questions
 

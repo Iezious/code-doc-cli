@@ -97,6 +97,8 @@ Prints the resolved configuration (config file values merged with defaults) and 
 code_index config show [--format text|json]
 ```
 
+Phase 1 ships only the **resolved config** portion of the output (the config-file values merged with defaults plus `project_root` and `config_path`). The **index metadata** portion (`schema_version`, `embed_model`) lands in Phase 7 once the indexer has populated `meta` rows; until then, `config show` does not open any index file. See [mvp-phases](mvp-phases.md).
+
 ### `code_index doctor`
 
 Intended to diagnose common problems in one place: missing extension, schema mismatch, model mismatch, stale index, missing API key for the configured backend.

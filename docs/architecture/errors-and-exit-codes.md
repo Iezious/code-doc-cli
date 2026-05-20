@@ -70,6 +70,13 @@ Under `--format json`, failures are written to stdout as:
 
 Failures below are grouped by category. Each entry names the failure mode, the exit code, and the `kind` string. The list is the **MVP contract**; new entries can be added in minor versions, existing entries do not change `kind` or `code`.
 
+### CLI scaffolding (code 1)
+
+- Unimplemented subcommand stub → `cli.not_implemented` (code 1). The `detail` payload includes `subcommand` (the dotted invocation, e.g. `"index build"`) and `phase` (the MVP phase number that lands the real implementation), so agents can dispatch on either.
+- The embeddings factory raises `cli.not_implemented` when `embed_backend = "voyage"`, until Phase 7 lands the real Voyage backend. The `detail` payload uses the same `subcommand`/`phase` keys for consistency, though `subcommand` here names the consuming surface (`"embeddings.from_config"`) rather than a CLI subcommand.
+
+These entries are **transient**: each row is removed from this surface as Phases 4, 5, and 6 implement the corresponding subcommand. Once the MVP is complete, only the embeddings factory's voyage stub (see [embeddings](embeddings.md)) still raises this kind; that stub is itself removed when Phase 7 lands the Voyage backend.
+
 ### Config (code 2)
 
 - Malformed TOML → `config.parse_error`.
@@ -123,6 +130,10 @@ See [embeddings](embeddings.md) for backend behavior.
 - Non-UTF-8 file with no fallback decoder configured → `io.decode_error` (code 40).
 - File exceeds max-file-size limit → **skip + warn** in default mode; under `--strict`, exit `41` with `kind = "io.oversize"`.
 
+### Unknown (code 99)
+
+- Any exception not mapped by a subcommand's boundary handler → `kind = "unknown"` (code 99). The catch-all kind is `"unknown"`, not `"unknown.exception"` — the dotted-category convention is relaxed here because the kind has no subcategories. `detail` is omitted (the failure is by definition not categorized). Code 99 indicates a bug; it must never be relied on as a normal failure path.
+
 ## Default vs `--strict` mode
 
 For parsing and IO categories, default behavior is **skip the offending file, warn on stderr, continue, exit 0**. `--strict` upgrades the skip into a failure with the documented code. Strict mode is intended for CI gates; default mode is intended for interactive and pipeline use, where one bad file should not block an index build.
@@ -143,4 +154,4 @@ For parsing and IO categories, default behavior is **skip the offending file, wa
 
 ## Open questions
 
-None pinned here. When `code_index doctor` is designed (v1.1), it will compose checks against this same code/kind surface; no new contract should be needed.
+- Whether `cli.not_implemented` should be renamed (e.g. `feature.not_implemented`) or split into surface-specific kinds (`cli.not_implemented` + `backend.not_implemented`) before Phase 7. The kind was introduced as CLI-only in Phase 1; Phase 2 added a second consumer (the embeddings factory's voyage stub) outside the CLI surface, making the current name a slight category abuse. The rename, if it happens, must land before any further consumers are added. Defer the call to Phase 7's planning, when the Voyage backend either obsoletes the stub or motivates `backend.not_implemented`.

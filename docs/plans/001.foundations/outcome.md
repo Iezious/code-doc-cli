@@ -43,3 +43,7 @@ Phase 1 ships: package skeleton, errors infrastructure, config loader, storage l
 - Step 005: chose `kind = "unknown"` (not `"unknown.exception"`) for the unhandled-exception envelope (`code = 99`). Documented inline in `src/code_index/cli.py` (`_UNKNOWN_KIND`) and pinned by `tests/test_cli.py::test_unhandled_exception_envelope`. Possible impact: add a line under "Enumerated failure surface" in `docs/architecture/errors-and-exit-codes.md` recording `"unknown" (code 99)` as the catch-all kind alongside the existing exit-code-table entry. The doc currently names code 99 in the table but does not pin a `kind` string for it.
 - Step 005: Phase 1 `config show` JSON shape is the single key `"config"` containing eleven fields (the resolved-config fields plus `project_root` and `config_path`). Pinned by `tests/test_cli.py::test_config_show_valid_json`. Phase 7 will add an `"index"` sibling per the planner's `cli.md` delta in this outcome file.
 - Step 005: the `cli.not_implemented` `detail` payload includes `subcommand` and `phase` keys so agents can dispatch on either; not yet documented in `errors-and-exit-codes.md`. Possible impact: add a one-line note in the upcoming "CLI scaffolding (code 1)" subsection naming the detail keys.
+
+---
+
+Applied 2026-05-19.
