@@ -28,6 +28,7 @@ Thumbs.db
 *.sqlite-shm
 *.sqlite-wal
 .helpers/index.sqlite
+docs/.helpers/
 .claude/settings.local.json
 
 # fastembed model cache (populated by integration tests; persistent across runs)
