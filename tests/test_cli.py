@@ -193,8 +193,9 @@ def test_config_show_failure_envelope(
 @pytest.mark.parametrize(
     "argv",
     [
-        ["init"],
-        ["index", "build"],
+        # ``init`` and ``index build`` are real implementations as of Phase 4
+        # (steps 002 and 004); their entries were removed from this
+        # parametrize.
         ["index", "sync"],
         ["index", "rebuild"],
         ["search", "foo"],
@@ -215,7 +216,10 @@ def test_stub_subcommands_envelope(
 
 
 def test_stub_text_mode_stderr_only(capsys: pytest.CaptureFixture[str]) -> None:
-    code, out, err = _run(["init"], capsys)
+    # ``index sync`` is still a stub in Phase 4 (lands in Phase 6); use it
+    # in place of the now-implemented ``init`` to exercise text-mode stub
+    # output.
+    code, out, err = _run(["index", "sync"], capsys)
     assert code == 1
     # Text mode: nothing on stdout, summary on stderr.
     assert out == ""

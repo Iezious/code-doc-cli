@@ -73,4 +73,4 @@ protocol; empty input is a no-op per the Phase 2 backend implementation.
 
 ## Observations
 
-_populated by the coder during implementation_
+- Step 001: `pathspec>=0.12` resolved to `pathspec==1.1.1` on install. Newer pathspec deprecates the `"gitwildmatch"` factory name in favor of `"gitignore"` (GitIgnoreBasicPattern / GitIgnoreSpecPattern). The walker still uses `"gitwildmatch"` per the pinned wording in `architecture.md` ("Indexer walking" -> "Ignore sources") and `001.context.md` ("Use `pathspec` with `GitWildMatchPattern`"), which surfaces ~1000 `DeprecationWarning` lines in the walker test output. Possible impact: the architect may want to update `architecture.md`'s "Indexer walking" wording to allow either `gitwildmatch` or `gitignore`, or pin a tighter upper bound on `pathspec` (`pathspec>=0.12,<1` keeps the legacy name authoritative). The semantic behavior is unchanged either way.

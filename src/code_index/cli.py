@@ -28,6 +28,7 @@ from typing import Annotated, Any
 import click
 import typer
 
+from code_index import indexer
 from code_index.config import CodeIndexConfig, discover_config_path, load_config
 from code_index.errors import (
     EXIT_INDEX_MISSING,
@@ -40,6 +41,7 @@ from code_index.errors import (
     write_json_stdout,
     write_result_stdout,
 )
+from code_index.init import write_skeleton
 
 # Synthesized kind for unhandled exceptions; documented in the DoD-5 test.
 _UNKNOWN_KIND: str = "unknown"
@@ -164,24 +166,83 @@ def cli_init(
         bool, typer.Option("--force", help="Overwrite existing config.")
     ] = False,
 ) -> None:
-    """Initialize ``docs/.helpers/`` in the current project (Phase 4)."""
-    del name, force
-    _stub("init", 4)
+    """Initialize ``docs/.helpers/`` in the current project.
+
+    Writes ``docs/.helpers/config.toml`` and ``docs/.helpers/.gitignore``
+    under the current working directory. Refuses to clobber an existing
+    ``config.toml`` unless ``--force`` is passed; the refuse path surfaces
+    as the Phase 1 error envelope (code 1, kind ``cli.not_implemented`` —
+    the closest existing fit per ``002.context.md``). The ``.gitignore``
+    write is idempotent: identical contents skip the write so mtime stays
+    stable.
+    """
+    project_root: Path = Path.cwd()
+    config_path, _gitignore_path, _gitignore_written = write_skeleton(
+        project_root, project_name=name, force=force
+    )
+    # Single-line stdout summary; the JSON shape will be tightened in Phase 7.
+    write_result_stdout(f"wrote {config_path.relative_to(project_root).as_posix()}")
 
 
 @index_app.command("build")
 def cli_index_build(
+    ctx: typer.Context,
     root: Annotated[
-        list[str] | None,
-        typer.Option("--root", help="Override config roots."),
+        Path | None,
+        typer.Option("--root", help="Override the walk root for this invocation."),
     ] = None,
     dry_run: Annotated[
-        bool, typer.Option("--dry-run", help="Walk and chunk only.")
+        bool, typer.Option("--dry-run", help="Walk and chunk only; do not write rows.")
+    ] = False,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", help="Per-file timing lines on stderr."),
     ] = False,
 ) -> None:
-    """Full index build (Phase 4)."""
-    del root, dry_run
-    _stub("index build", 4)
+    """Build the index for the current project.
+
+    Thin wrapper over :func:`code_index.indexer.build`. Discovers the
+    project config via the Phase 1 upward walk for
+    ``docs/.helpers/config.toml`` (or honors the global ``--config``
+    override); resolves the walk root to ``--root`` when given, else the
+    parent of ``docs/.helpers/``; and prints a summary on stdout.
+
+    Under ``--format text`` the summary is the single line
+    ``indexed <N> files, <M> chunks``. Under ``--format json`` the summary
+    is one JSON object with the :class:`code_index.indexer.IndexerResult`
+    fields. ``CodeIndexError`` raised by config discovery or by
+    ``indexer.build`` propagates to the Phase 1 envelope handler.
+    """
+    ctx_obj: dict[str, Any] = ctx.obj or {}
+    format_value: str = ctx_obj.get("format", "text")
+    verbose_flag: bool = bool(verbose or ctx_obj.get("verbose", False))
+
+    config_path: Path = _resolve_config_path(ctx)
+    cfg: CodeIndexConfig = load_config(config_path)
+
+    # Project root = parent of `docs/.helpers/`. `--root` overrides only the
+    # walk root, not the config-relative project root (matches the indexer's
+    # treatment of `root` as the directory to walk).
+    walk_root: Path = (
+        Path(root).resolve() if root is not None else config_path.parent.parent.parent.resolve()
+    )
+
+    result = indexer.build(cfg, walk_root, dry_run=dry_run, verbose=verbose_flag)
+
+    if format_value == "json":
+        payload: dict[str, Any] = {
+            "files_walked": result.files_walked,
+            "files_chunked": result.files_chunked,
+            "chunks_inserted": result.chunks_inserted,
+            "symbols_inserted": result.symbols_inserted,
+            "edges_inserted": result.edges_inserted,
+            "seconds_elapsed": result.seconds_elapsed,
+        }
+        write_json_stdout(payload)
+        return
+
+    write_result_stdout(
+        f"indexed {result.files_chunked} files, {result.chunks_inserted} chunks"
+    )
 
 
 @index_app.command("sync")
