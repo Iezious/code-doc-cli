@@ -72,7 +72,7 @@ Strictly Phase 3's bullet list and DoD from `mvp-phases.md`. Out of scope here:
 - **One plugin = one module = one `LANGUAGE` export.** No registry side effects on import beyond defining `LANGUAGE`. The registry's `from_builtins()` does the importing and harvesting.
 - **`Language` is a `@runtime_checkable` Protocol.** Every plugin must satisfy `isinstance(plugin, Language)`.
 - **Plugin `name` and `extensions` match `chunking-and-languages.md`'s "Per-language plugins" section verbatim.** Names: `"python"`, `"csharp"`, `"javascript"`, `"typescript"`, `"go"` (note: module is `golang.py`, plugin name is `"go"`), `"fsharp"`, `"lsl"`. Extensions: as documented per plugin.
-- **Plugins never call I/O.** `chunk`, `symbols`, `imports` receive `(path, content)`. The F# plugin reads `.fsproj` only if its caller passes its location — see step 007 context for the exact call shape.
+- **Plugins never call I/O — with one documented exception.** `chunk`, `symbols`, `imports` receive `(path, content)`. The F# plugin reads `.fsproj` to recover compile-order semantics; it supports both modes: (a) by default it walks parent directories (depth-bounded) to locate a sibling/ancestor `*.fsproj`, and (b) a caller can pre-resolve the `.fsproj` path via the `FSharpPlugin(fsproj_path=...)` constructor argument. Either way the Protocol method signatures stay `(path, content) → ...`; the override only affects the plugin's internal discovery. See `007.context.md` for the exact walk rules and caching.
 - **Plugins never raise on malformed input in the default path.** Errors are converted to the plugin returning sensible empty results; raising is reserved for genuinely undecidable cases (Phase 4 will catch and apply skip-or-strict per [`../../architecture/errors-and-exit-codes.md`](../../architecture/errors-and-exit-codes.md), code 30). Phase 3 does not implement skip/strict at the call site — only the plugins' own error-tolerance.
 - **No engine code changes outside `src/code_index/languages/`** and the single `pyproject.toml` edit. In particular, `config.py` is not modified — `extra_languages` validation already exists from Phase 1 (resolves paths, raises `config.bad_path`); the registry layer consumes the resolved list.
 - **Steps 002–008 are independent.** They each depend only on step 001. They can be coded in parallel.
@@ -85,7 +85,7 @@ Strictly Phase 3's bullet list and DoD from `mvp-phases.md`. Out of scope here:
 - **Built-in plugins** — the seven modules under `src/code_index/languages/` whose `LANGUAGE` exports are collected by `LanguageRegistry.from_builtins()`.
 - **Extra language** — a plugin loaded at config time from a path in `config.extra_languages`, via `importlib.util`.
 - **Registry** — a `LanguageRegistry` instance: extension → plugin map plus the name-filter helper.
-- **Active plugins** — registry after `filter_active(config.languages)` is applied; unlisted built-ins are dropped, extras are kept.
+- **Active plugins** — registry after `filter_active(config.languages)` is applied uniformly to both built-ins and extras. Any plugin whose `name` is not in `config.languages` is dropped, regardless of whether it came from a built-in module or `extra_languages`.
 - **Snapshot** — a syrupy `.ambr` file capturing the exact list of `Chunk` / `Symbol` / `Edge` dataclass instances produced by a plugin for one fixture file.
 
 ## Dependency direction

@@ -1,0 +1,33 @@
+# serializer version: 1
+# name: test_chunk_snapshot
+  list([
+    Chunk(start_line=1, end_line=1, kind='module', name=None, scope=None, text='package widgets\n'),
+    Chunk(start_line=11, end_line=11, kind='module', name=None, scope=None, text='const Pi = 3.14\n'),
+    Chunk(start_line=13, end_line=16, kind='module', name=None, scope=None, text='var (\n\tCounter = 0\n\tName    = "widgets"\n)\n'),
+    Chunk(start_line=18, end_line=20, kind='type', name='Frobnicator', scope=None, text='type Frobnicator struct {\n\tItems []string\n}\n'),
+    Chunk(start_line=22, end_line=22, kind='type', name='ItemList', scope=None, text='type ItemList = []string\n'),
+    Chunk(start_line=24, end_line=26, kind='function', name='New', scope=None, text='func New() *Frobnicator {\n\treturn &Frobnicator{}\n}\n'),
+    Chunk(start_line=28, end_line=30, kind='function', name='Run', scope='widgets.Frobnicator', text='func (f *Frobnicator) Run() error {\n\treturn nil\n}\n'),
+    Chunk(start_line=32, end_line=34, kind='function', name='Render', scope='widgets.Frobnicator', text='func (f Frobnicator) Render() string {\n\treturn "frob"\n}\n'),
+    Chunk(start_line=36, end_line=39, kind='function', name='Helper', scope=None, text='func Helper(x int) int {\n\tfmt.Println(x)\n\treturn x + 1\n}\n'),
+  ])
+# ---
+# name: test_import_snapshot
+  list([
+    Edge(target='fmt', kind='import', line=3, meta=None),
+    Edge(target='fmt', kind='import', line=5, meta={'alias': 'f'}),
+    Edge(target='embed', kind='import', line=6, meta={'alias': '_'}),
+    Edge(target='errors', kind='import', line=7, meta={'alias': '.'}),
+    Edge(target='io', kind='import', line=8, meta=None),
+  ])
+# ---
+# name: test_symbol_snapshot
+  list([
+    Symbol(name='widgets.Frobnicator', kind='def', line=18),
+    Symbol(name='widgets.ItemList', kind='def', line=22),
+    Symbol(name='widgets.New', kind='def', line=24),
+    Symbol(name='widgets.Frobnicator.Run', kind='def', line=28),
+    Symbol(name='widgets.Frobnicator.Render', kind='def', line=32),
+    Symbol(name='widgets.Helper', kind='def', line=36),
+  ])
+# ---

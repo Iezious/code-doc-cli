@@ -19,7 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 voyage = ["voyageai>=0.2"]
-dev = ["pytest>=8", "ruff>=0.6", "pyright>=1.1.350"]
+dev = ["pytest>=8", "ruff>=0.6", "pyright>=1.1.350", "syrupy>=4"]
 
 [project.scripts]
 code_index = "code_index.cli:app"
@@ -34,6 +34,7 @@ packages = ["src/code_index"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+extend-exclude = ["tests/fixtures"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM"]
@@ -41,6 +42,7 @@ ignore = ["E501"]
 
 [tool.pyright]
 include = ["src/code_index", "tests"]
+exclude = ["tests/fixtures"]
 strict = ["src/code_index"]
 pythonVersion = "3.11"
 typeCheckingMode = "basic"

@@ -1,0 +1,29 @@
+# serializer version: 1
+# name: test_chunk_snapshot
+  list([
+    Chunk(start_line=1, end_line=9, kind='module', name=None, scope=None, text='"""Module-level docstring."""\n\nimport os\nimport sys as system\nfrom pathlib import Path\nfrom . import sibling\nfrom ..pkg import utility\n\nCONSTANT = 1  # forces a module-body chunk to exist\n'),
+    Chunk(start_line=12, end_line=13, kind='function', name='top_level', scope=None, text='def top_level() -> int:\n    return CONSTANT\n'),
+    Chunk(start_line=16, end_line=17, kind='function', name='async_func', scope=None, text='async def async_func():\n    pass\n'),
+    Chunk(start_line=20, end_line=26, kind='class', name='Widget', scope=None, text='class Widget:\n    """Class docstring."""\n\n    def method(self) -> int:\n        def helper():\n            return 1\n        return helper()\n'),
+    Chunk(start_line=23, end_line=26, kind='function', name='method', scope='Widget', text='    def method(self) -> int:\n        def helper():\n            return 1\n        return helper()\n'),
+    Chunk(start_line=24, end_line=25, kind='function', name='helper', scope='Widget.method', text='        def helper():\n            return 1\n'),
+  ])
+# ---
+# name: test_import_snapshot
+  list([
+    Edge(target='os', kind='import', line=3, meta=None),
+    Edge(target='sys', kind='import', line=4, meta=None),
+    Edge(target='pathlib.Path', kind='import', line=5, meta=None),
+    Edge(target='.sibling', kind='import', line=6, meta=None),
+    Edge(target='..pkg.utility', kind='import', line=7, meta=None),
+  ])
+# ---
+# name: test_symbol_snapshot
+  list([
+    Symbol(name='top_level', kind='def', line=12),
+    Symbol(name='async_func', kind='def', line=16),
+    Symbol(name='Widget', kind='def', line=20),
+    Symbol(name='Widget.method', kind='def', line=23),
+    Symbol(name='Widget.method.helper', kind='def', line=24),
+  ])
+# ---

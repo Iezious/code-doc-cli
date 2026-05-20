@@ -1,0 +1,36 @@
+# serializer version: 1
+# name: test_chunk_snapshot
+  list([
+    Chunk(start_line=1, end_line=2, kind='module', name=None, scope=None, text='integer counter = 0;\nstring name = "widget";'),
+    Chunk(start_line=4, end_line=7, kind='function', name='add', scope='global', text='integer add(integer x, integer y)\n{\n    return x + y;\n}'),
+    Chunk(start_line=9, end_line=24, kind='state', name='default', scope=None, text='default\n{\n    state_entry()\n    {\n        llSay(0, "ready");\n        llListen(42, "", NULL_KEY, "");\n        osSetSpeed(1.0);\n    }\n\n    touch_start(integer n)\n    {\n        llMessageLinked(LINK_THIS, 1, "touched", "");\n        llHTTPRequest("https://example.invalid/x", [], "");\n        llEmail("dest@example.invalid", "hello", "body");\n    }\n}'),
+    Chunk(start_line=11, end_line=16, kind='event', name='state_entry', scope='default', text='state_entry()\n    {\n        llSay(0, "ready");\n        llListen(42, "", NULL_KEY, "");\n        osSetSpeed(1.0);\n    }'),
+    Chunk(start_line=18, end_line=23, kind='event', name='touch_start', scope='default', text='touch_start(integer n)\n    {\n        llMessageLinked(LINK_THIS, 1, "touched", "");\n        llHTTPRequest("https://example.invalid/x", [], "");\n        llEmail("dest@example.invalid", "hello", "body");\n    }'),
+    Chunk(start_line=26, end_line=32, kind='state', name='idle', scope=None, text='state idle\n{\n    state_entry()\n    {\n        llSay(0, "idle");\n    }\n}'),
+    Chunk(start_line=28, end_line=31, kind='event', name='state_entry', scope='idle', text='state_entry()\n    {\n        llSay(0, "idle");\n    }'),
+  ])
+# ---
+# name: test_import_snapshot
+  list([
+    Edge(target='42', kind='listen', line=14, meta=None),
+    Edge(target='LINK_THIS', kind='link_message', line=20, meta=None),
+    Edge(target='"https://example.invalid/x"', kind='http', line=21, meta=None),
+    Edge(target='"dest@example.invalid"', kind='email', line=22, meta=None),
+  ])
+# ---
+# name: test_symbol_snapshot
+  list([
+    Symbol(name='counter', kind='def', line=1),
+    Symbol(name='name', kind='def', line=2),
+    Symbol(name='add', kind='def', line=4),
+    Symbol(name='default.state_entry', kind='def', line=11),
+    Symbol(name='default.touch_start', kind='def', line=18),
+    Symbol(name='idle.state_entry', kind='def', line=28),
+    Symbol(name='llSay', kind='ref', line=13),
+    Symbol(name='llListen', kind='ref', line=14),
+    Symbol(name='llMessageLinked', kind='ref', line=20),
+    Symbol(name='llHTTPRequest', kind='ref', line=21),
+    Symbol(name='llEmail', kind='ref', line=22),
+    Symbol(name='llSay', kind='ref', line=30),
+  ])
+# ---

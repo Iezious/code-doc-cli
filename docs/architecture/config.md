@@ -91,4 +91,5 @@ The intent is that the file is small enough to read on first open and obvious en
 
 ## Open questions
 
-None pinned here. Workspace-level config that defaults values across sibling projects is open in [tool-and-data-split](tool-and-data-split.md) and is cut from MVP (see [mvp-scope](mvp-scope.md)).
+- **Per-plugin config sub-tables.** The schema rationale anticipates `[code_index.languages.<lang>]` future sections (see "One table, one place" in this doc), but no concrete schema exists. The Phase 3 LSL plugin defers OSSL recognition because it would need exactly such a sub-table (see [chunking-and-languages](chunking-and-languages.md), LSL section). Decide before Phase 4+ work depends on it, or before a Phase 3 OSSL bug forces the question. Two paths: (a) commit a concrete sub-table schema (key naming, nesting rules, validation, surfacing in `config show`), or (b) commit a "deferred to v1.x" stance and document that `extra_languages` is the only per-plugin extension point in MVP.
+- Workspace-level config that defaults values across sibling projects is open in [tool-and-data-split](tool-and-data-split.md) and is cut from MVP (see [mvp-scope](mvp-scope.md)).

@@ -1,0 +1,31 @@
+# serializer version: 1
+# name: test_chunk_snapshot
+  list([
+    Chunk(start_line=5, end_line=5, kind='type', name='Box', scope=None, text='export type Box<T> = { value: T };\n'),
+    Chunk(start_line=6, end_line=8, kind='interface', name='Container', scope=None, text='export interface Container<T> {\n    items: T[];\n}\n'),
+    Chunk(start_line=9, end_line=9, kind='enum', name='Color', scope=None, text='export enum Color { Red, Green, Blue }\n'),
+    Chunk(start_line=11, end_line=14, kind='namespace', name='Geometry', scope=None, text='namespace Geometry {\n    export class Point { constructor(public x: number, public y: number) {} }\n    export function distance(a: Point, b: Point): number { return 0; }\n}\n'),
+    Chunk(start_line=12, end_line=12, kind='class', name='Point', scope='Geometry', text='    export class Point { constructor(public x: number, public y: number) {} }\n'),
+    Chunk(start_line=12, end_line=12, kind='function', name='constructor', scope='Geometry.Point', text='    export class Point { constructor(public x: number, public y: number) {} }\n'),
+    Chunk(start_line=13, end_line=13, kind='function', name='distance', scope='Geometry', text='    export function distance(a: Point, b: Point): number { return 0; }\n'),
+    Chunk(start_line=16, end_line=19, kind='class', name='Widget', scope=None, text='export class Widget {\n    items: Color[] = [];\n    render(): ReactNode { return null; }\n}\n'),
+    Chunk(start_line=18, end_line=18, kind='function', name='render', scope='Widget', text='    render(): ReactNode { return null; }\n'),
+    Chunk(start_line=21, end_line=21, kind='function', name=None, scope=None, text='export default function () { return new Widget(); }\n'),
+  ])
+# ---
+# name: test_import_snapshot
+  list([
+    Edge(target='react', kind='import', line=1, meta={'names': ['useState']}),
+    Edge(target='react', kind='import', line=2, meta={'names': ['ReactNode'], 'type_only': True}),
+    Edge(target='fs', kind='import', line=3, meta={'names': ['* as fs']}),
+  ])
+# ---
+# name: test_symbol_snapshot
+  list([
+    Symbol(name='Box', kind='def', line=5),
+    Symbol(name='Container', kind='def', line=6),
+    Symbol(name='Color', kind='def', line=9),
+    Symbol(name='Widget', kind='def', line=16),
+    Symbol(name='default::sample', kind='def', line=21),
+  ])
+# ---

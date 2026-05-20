@@ -1,0 +1,36 @@
+# serializer version: 1
+# name: test_chunk_snapshot
+  list([
+    Chunk(start_line=1, end_line=4, kind='namespace', name='MyCorp', scope='|fsproj=0', text='namespace MyCorp\n\nopen System\nopen System.IO\n'),
+    Chunk(start_line=6, end_line=23, kind='module', name='Geometry', scope='MyCorp|fsproj=0', text='module Geometry =\n\n    type Point = { X: int; Y: int }\n\n    type Color =\n        | Red\n        | Green of int\n        | Blue of name: string\n\n    let origin = { X = 0; Y = 0 }\n\n    let rec distance (a: Point) (b: Point) : float =\n        sqrt (float ((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y)))\n\n    type FooBuilder() =\n        member _.Return(x) = [x]\n\n    let foo = FooBuilder()\n'),
+    Chunk(start_line=8, end_line=8, kind='type', name='Point', scope='MyCorp.Geometry|fsproj=0', text='    type Point = { X: int; Y: int }\n'),
+    Chunk(start_line=10, end_line=13, kind='type', name='Color', scope='MyCorp.Geometry|fsproj=0', text='    type Color =\n        | Red\n        | Green of int\n        | Blue of name: string\n'),
+    Chunk(start_line=15, end_line=15, kind='function', name='origin', scope='MyCorp.Geometry|fsproj=0', text='    let origin = { X = 0; Y = 0 }\n'),
+    Chunk(start_line=17, end_line=18, kind='function', name='distance', scope='MyCorp.Geometry|fsproj=0', text='    let rec distance (a: Point) (b: Point) : float =\n        sqrt (float ((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y)))\n'),
+    Chunk(start_line=20, end_line=21, kind='type', name='FooBuilder', scope='MyCorp.Geometry|fsproj=0', text='    type FooBuilder() =\n        member _.Return(x) = [x]\n'),
+    Chunk(start_line=21, end_line=21, kind='function', name='Return', scope='MyCorp.Geometry.FooBuilder|fsproj=0', text='        member _.Return(x) = [x]\n'),
+    Chunk(start_line=23, end_line=23, kind='function', name='foo', scope='MyCorp.Geometry|fsproj=0', text='    let foo = FooBuilder()\n'),
+  ])
+# ---
+# name: test_import_snapshot
+  list([
+    Edge(target='System', kind='import', line=3, meta=None),
+    Edge(target='System.IO', kind='import', line=4, meta=None),
+  ])
+# ---
+# name: test_symbol_snapshot
+  list([
+    Symbol(name='MyCorp', kind='def', line=1),
+    Symbol(name='MyCorp.Geometry', kind='def', line=6),
+    Symbol(name='MyCorp.Geometry.Point', kind='def', line=8),
+    Symbol(name='MyCorp.Geometry.Color', kind='def', line=10),
+    Symbol(name='MyCorp.Geometry.Color.Red', kind='def', line=11),
+    Symbol(name='MyCorp.Geometry.Color.Green', kind='def', line=12),
+    Symbol(name='MyCorp.Geometry.Color.Blue', kind='def', line=13),
+    Symbol(name='MyCorp.Geometry.origin', kind='def', line=15),
+    Symbol(name='MyCorp.Geometry.distance', kind='def', line=17),
+    Symbol(name='MyCorp.Geometry.FooBuilder', kind='def', line=20),
+    Symbol(name='MyCorp.Geometry.FooBuilder.Return', kind='def', line=21),
+    Symbol(name='MyCorp.Geometry.foo', kind='def', line=23),
+  ])
+# ---

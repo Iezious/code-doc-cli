@@ -1,0 +1,27 @@
+# serializer version: 1
+# name: test_chunk_snapshot
+  list([
+    Chunk(start_line=6, end_line=6, kind='module', name=None, scope=None, text='console.log("module-scope side effect");\n'),
+    Chunk(start_line=8, end_line=10, kind='function', name='namedExport', scope=None, text='export function namedExport() {\n    return 1;\n}\n'),
+    Chunk(start_line=12, end_line=12, kind='function', name='arrowAtModuleScope', scope=None, text='const arrowAtModuleScope = (x) => x + 1;\n'),
+    Chunk(start_line=14, end_line=17, kind='class', name='Widget', scope=None, text='export class Widget {\n    constructor() {}\n    method() { return arrowAtModuleScope(1); }\n}\n'),
+    Chunk(start_line=15, end_line=15, kind='function', name='constructor', scope='Widget', text='    constructor() {}\n'),
+    Chunk(start_line=16, end_line=16, kind='function', name='method', scope='Widget', text='    method() { return arrowAtModuleScope(1); }\n'),
+    Chunk(start_line=19, end_line=21, kind='function', name=None, scope=None, text='export default function () {\n    return new Widget();\n}\n'),
+  ])
+# ---
+# name: test_import_snapshot
+  list([
+    Edge(target='react', kind='import', line=1, meta={'names': ['useState']}),
+    Edge(target='fs', kind='import', line=2, meta={'names': ['* as fs']}),
+    Edge(target='./side-effect', kind='import', line=3, meta={'names': []}),
+    Edge(target='path', kind='import', line=4, meta={'names': [], 'form': 'require'}),
+  ])
+# ---
+# name: test_symbol_snapshot
+  list([
+    Symbol(name='namedExport', kind='def', line=8),
+    Symbol(name='Widget', kind='def', line=14),
+    Symbol(name='default::sample', kind='def', line=19),
+  ])
+# ---

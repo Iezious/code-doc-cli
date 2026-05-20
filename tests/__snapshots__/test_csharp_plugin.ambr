@@ -1,0 +1,36 @@
+# serializer version: 1
+# name: test_chunk_snapshot
+  list([
+    Chunk(start_line=6, end_line=6, kind='module', name=None, scope=None, text='Console.WriteLine("hello");\n'),
+    Chunk(start_line=10, end_line=19, kind='class', name='Frobnicator', scope='MyCorp.Widgets', text='    public class Frobnicator\n    {\n        public Frobnicator() { }\n\n        public int Bar(int x)\n        {\n            int Local(int y) => y * 2;\n            return Local(x);\n        }\n    }\n'),
+    Chunk(start_line=12, end_line=12, kind='function', name='Frobnicator', scope='MyCorp.Widgets.Frobnicator', text='        public Frobnicator() { }\n'),
+    Chunk(start_line=14, end_line=18, kind='function', name='Bar', scope='MyCorp.Widgets.Frobnicator', text='        public int Bar(int x)\n        {\n            int Local(int y) => y * 2;\n            return Local(x);\n        }\n'),
+    Chunk(start_line=16, end_line=16, kind='function', name='Local', scope='MyCorp.Widgets.Frobnicator.Bar', text='            int Local(int y) => y * 2;\n'),
+    Chunk(start_line=21, end_line=24, kind='struct', name='Point2', scope='MyCorp.Widgets', text='    public struct Point2\n    {\n        public int X;\n    }\n'),
+    Chunk(start_line=26, end_line=26, kind='record', name='Rec', scope='MyCorp.Widgets', text='    public record Rec(int X, string Name);\n'),
+    Chunk(start_line=28, end_line=31, kind='interface', name='IBaz', scope='MyCorp.Widgets', text='    public interface IBaz\n    {\n        void Quux();\n    }\n'),
+    Chunk(start_line=30, end_line=30, kind='function', name='Quux', scope='MyCorp.Widgets.IBaz', text='        void Quux();\n'),
+    Chunk(start_line=33, end_line=37, kind='enum', name='Color', scope='MyCorp.Widgets', text='    public enum Color\n    {\n        Red,\n        Green,\n    }\n'),
+  ])
+# ---
+# name: test_import_snapshot
+  list([
+    Edge(target='System', kind='import', line=1, meta=None),
+    Edge(target='System.Collections.Generic', kind='import', line=2, meta=None),
+    Edge(target='System.Math', kind='import', line=3, meta=None),
+    Edge(target='System.IO.Path', kind='import', line=4, meta=None),
+  ])
+# ---
+# name: test_symbol_snapshot
+  list([
+    Symbol(name='MyCorp.Widgets.Frobnicator', kind='def', line=10),
+    Symbol(name='MyCorp.Widgets.Frobnicator.Frobnicator', kind='def', line=12),
+    Symbol(name='MyCorp.Widgets.Frobnicator.Bar', kind='def', line=14),
+    Symbol(name='MyCorp.Widgets.Frobnicator.Bar.Local', kind='def', line=16),
+    Symbol(name='MyCorp.Widgets.Point2', kind='def', line=21),
+    Symbol(name='MyCorp.Widgets.Rec', kind='def', line=26),
+    Symbol(name='MyCorp.Widgets.IBaz', kind='def', line=28),
+    Symbol(name='MyCorp.Widgets.IBaz.Quux', kind='def', line=30),
+    Symbol(name='MyCorp.Widgets.Color', kind='def', line=33),
+  ])
+# ---

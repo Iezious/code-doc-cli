@@ -82,6 +82,8 @@ Failures below are grouped by category. Each entry names the failure mode, the e
 - `extra_languages` path missing or unreadable → `config.bad_path`.
 - `languages` references a name not registered → `config.unknown_language`.
 
+Both `config.bad_path` and `config.unknown_language` are also emitted by the language registry's `load_extra_language` at module-load time — `config.bad_path` when an `extra_languages` path cannot be loaded by `importlib` (race condition between config validation and load, or in-test direct invocation), and `config.unknown_language` when a loaded module exposes neither `LANGUAGE` nor `LANGUAGES`. The `kind` surface is intentionally uniform: an agent observing either kind treats config-validator failures and loader failures as the same class of failure mode.
+
 See [config](config.md) for the schema these checks enforce.
 
 ### Index/storage (codes 10, 12)

@@ -48,3 +48,31 @@ Phase 3 DoD per [`../../architecture/mvp-phases.md`](../../architecture/mvp-phas
 - `uv run pytest` / `uv run ruff check` / `uv run pyright` all pass.
 - For each of seven languages, a fixture file produces the expected `Chunk` / `Symbol` / `Edge` lists via snapshot.
 - Registry resolves an extension to the correct plugin; `extra_languages` from a fixture config loads and registers a synthetic plugin without engine changes.
+
+## Observations
+
+- Step 007: the F# plugin is the documented exception to the "plugins are pure `(path, content) -> data`" rule. It supports both discovery modes: a caller-supplied `.fsproj` path via `FSharpPlugin(fsproj_path=...)` (cleaner, Phase-4-friendly — the caller can resolve the project once and inject it), and self-discovery via a depth-bounded parent-walk (the pragmatic Phase-3 default; `LANGUAGE = FSharpPlugin()` uses this form). This tension is surfaced for the architect: at finalization, the architect can decide whether to (a) leave the F# carve-out as-is, (b) standardize on the caller-supplied form by adding a per-plugin meta channel to the `Language` Protocol in a later phase, or (c) record this as deferred to Phase 4's call-site design.
+- Step 007: the `chunking-and-languages.md` preamble added on 2026-05-19 forbidding filesystem traversal for *symbol identity* purposes stays correct as written — F# does not use `.fsproj` for naming. The compile-order index lives only on `Chunk.scope` as a `|fsproj=<N>` suffix (chunk metadata, not symbol identity); `Symbol.name` is composed against the *undecorated* enclosing scope so qualified symbol names never carry the marker. The "no I/O for naming" rule and F#'s `.fsproj`-for-ordering carve-out live in different concerns and do not conflict at the symbol-name level.
+- Step 007: chose storage form A (Option A from `007.context.md`) — the `fsproj_order` is appended to `Chunk.scope` as a `|fsproj=<N>` suffix, with no new fields on the `Chunk` dataclass. The architect may want to record this concrete choice in `chunking-and-languages.md`'s F# "Important detail" bullet (the planner-authored outcome section already lists this as an optional doc update); the alternative is to keep the architecture doc implementation-neutral and leave the format pinned only by the snapshot.
+
+## Applied 2026-05-20
+
+Finalized via `/architect`. The following items from "Planner section" and "Observations" were applied to `docs/architecture/`:
+
+- Item 1 — `chunking-and-languages.md` "Dispatch and registry": `LANGUAGE` / `LANGUAGES` export mechanism pinned. Applied as written.
+- Item 2 — `chunking-and-languages.md` LSL "OpenSim / OSSL": rewritten to record OSSL as deferred to v1.x; cross-links the config.md per-plugin sub-table open question. Applied with modification.
+- Item 3 — `config.md` "Open questions": per-plugin sub-table schema question added. Applied as written.
+- Item 4 — `errors-and-exit-codes.md` "Config (code 2)": clarifying paragraph added recording `config.bad_path` and `config.unknown_language` as having a second producer in the registry's `load_extra_language`. Applied with modification.
+- Item 5 — `chunking-and-languages.md` F# "Important detail": shipped Option A storage form (`|fsproj=<N>` suffix on `Chunk.scope`) documented. Applied with modification.
+- Observations 1 & 2 (folded together) — `chunking-and-languages.md` Implications F# bullet: rewritten to call out F# as the documented exception to the no-I/O rule, scope the exception to chunk metadata (not symbol identity), document the hybrid `fsproj_path=` discovery, and defer the Plugin Protocol meta-channel question to Phase 4. Applied with modification.
+
+Items deliberately not applied:
+
+- `mvp-phases.md` (Item 6 in planner section): no change required — Phase 3 DoD is met as stated.
+- Observation 3 — `fsproj_order` storage form: subsumed into Item 5 (same content); not a separate doc change.
+- `quick-reference.md`: no change — the one-line characterizations of the affected docs still hold.
+
+Items deliberately not surfaced to architecture (not in outcome.md, recorded only in step verifier reports):
+
+- Step 005 advisory: TS namespace-nested exports (when the outer namespace is not itself exported) do not surface in `symbols()`. Behavior pinned by snapshot; user chose to leave as-is during execution.
+- Step 008 advisories: DoD-wording inconsistencies in `008.lsl-plugin.md` regarding `imports()` returning `[]` vs the four edge kinds, and `llMessageLinked` first-arg vs second-arg. These are planner-side step-file wording bugs; the architecture doc's Edge dataclass already documents `imports()` as returning all outbound edge kinds (not import-specific). Plans are append-only; not applied.
