@@ -29,3 +29,7 @@ Phase 2 ships: the `code_index.embeddings` package (`protocol.py`, `fastembed.py
 - `FastembedBackend("jinaai/jina-embeddings-v2-base-code").encode(["foo", "bar"]).shape == (2, 768)`.
 - First-run downloads cache under `tests/.cache/fastembed/`; second run reuses the cache.
 - `from_config(config)` returns `FastembedBackend` for `embed_backend="fastembed"` and raises `CodeIndexError(EXIT_USAGE, Kinds.CLI_NOT_IMPLEMENTED, ...)` for `embed_backend="voyage"`.
+
+---
+
+Applied 2026-05-19.

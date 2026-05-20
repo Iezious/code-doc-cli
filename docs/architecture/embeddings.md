@@ -38,6 +38,8 @@ class EmbeddingBackend(Protocol):
 
 The MVP ships one implementation of this Protocol (`fastembed`). The Protocol is the documented extension point — additional backends are roadmap items, tracked under `## Embedding ecosystem` in [roadmap](roadmap.md).
 
+The Phase 2 implementation is exposed as `code_index.embeddings.FastembedBackend`; consumers (the indexer, `config show`'s Phase 7 extension) instantiate backends via the single factory entry point `code_index.embeddings.from_config(config)` rather than constructing implementation classes directly.
+
 Backends are instantiated from config:
 
 ```toml
