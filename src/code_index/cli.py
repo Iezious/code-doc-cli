@@ -22,6 +22,7 @@ in :mod:`code_index.errors``.
 from __future__ import annotations
 
 import enum
+import sqlite3
 import sys
 from pathlib import Path
 from typing import Annotated, Any
@@ -30,11 +31,15 @@ import click
 import typer
 
 from code_index import embeddings, indexer, storage
+from code_index import graph as graph_module
 from code_index import search as search_module
+from code_index import symbols as symbols_module
+from code_index import sync as sync_module
 from code_index.config import CodeIndexConfig, discover_config_path, load_config
 from code_index.errors import (
     EXIT_CONFIG,
     EXIT_INDEX_MISSING,
+    EXIT_INDEX_MODEL,
     EXIT_UNKNOWN,
     EXIT_USAGE,
     CodeIndexError,
@@ -47,6 +52,7 @@ from code_index.errors import (
 from code_index.init import write_skeleton
 from code_index.languages.registry import active_plugins
 from code_index.search import SearchFilters, SearchResult
+from code_index.storage import get_meta, open_index
 
 # Synthesized kind for unhandled exceptions; documented in the DoD-5 test.
 _UNKNOWN_KIND: str = "unknown"
@@ -145,22 +151,11 @@ def main(
 
 
 # ---------------------------------------------------------------------------
-# Stub helper.
-# ---------------------------------------------------------------------------
-
-
-def _stub(subcommand: str, phase: int) -> None:
-    """Raise the canonical ``cli.not_implemented`` error for a stub."""
-    raise CodeIndexError(
-        code=EXIT_USAGE,
-        kind=Kinds.CLI_NOT_IMPLEMENTED,
-        message=f"{subcommand} not implemented in this build (lands in Phase {phase})",
-        detail={"subcommand": subcommand, "phase": phase},
-    )
-
-
-# ---------------------------------------------------------------------------
-# Stubs — Phase 4 onward.
+# Subcommand implementations — every MVP subcommand is real as of Phase 6
+# step 004. The historical ``_stub`` helper that raised
+# :data:`Kinds.CLI_NOT_IMPLEMENTED` for then-unimplemented commands was
+# removed when the last stubs landed; reintroduce it (and its callers) if a
+# future phase needs to ship a placeholder subcommand again.
 # ---------------------------------------------------------------------------
 
 
@@ -251,18 +246,119 @@ def cli_index_build(
 
 
 @index_app.command("sync")
-def cli_index_sync() -> None:
-    """Incremental update (Phase 6)."""
-    _stub("index sync", 6)
+def cli_index_sync(
+    ctx: typer.Context,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", help="Per-file lines on stderr."),
+    ] = False,
+) -> None:
+    """Incremental update against the existing index.
+
+    Runs the Phase 6 pre-flight (discover config, verify the index file
+    exists, verify ``meta.embed_model`` / ``meta.embed_dim`` match the
+    configured backend), calls :func:`code_index.sync.sync`, and writes a
+    one-line summary on stdout (or the JSON shape under ``--format json``).
+    The boundary handler routes :class:`CodeIndexError` from the pre-flight
+    layer through the standard envelope.
+    """
+    ctx_obj: dict[str, Any] = ctx.obj or {}
+    format_value: str = ctx_obj.get("format", "text")
+    verbose_flag: bool = bool(verbose or ctx_obj.get("verbose", False))
+
+    cfg, project_root, conn, _backend = _preflight(ctx)
+    try:
+        result = sync_module.sync(cfg, project_root, verbose=verbose_flag)
+    finally:
+        conn.close()
+
+    if format_value == "json":
+        payload: dict[str, Any] = {
+            "files_added": result.files_added,
+            "files_changed": result.files_changed,
+            "files_unchanged": result.files_unchanged,
+            "files_removed": result.files_removed,
+            "chunks_inserted_total": result.chunks_inserted_total,
+            "seconds_elapsed": result.seconds_elapsed,
+        }
+        write_json_stdout(payload)
+        return
+
+    write_result_stdout(
+        f"synced: +{result.files_added} ~{result.files_changed} "
+        f"={result.files_unchanged} -{result.files_removed} "
+        f"({result.chunks_inserted_total} chunks) "
+        f"in {result.seconds_elapsed:.2f}s"
+    )
 
 
 @index_app.command("rebuild")
 def cli_index_rebuild(
-    yes: Annotated[bool, typer.Option("--yes", help="Skip confirmation.")] = False,
+    ctx: typer.Context,
+    yes: Annotated[
+        bool, typer.Option("--yes", help="Confirm destructive rebuild.")
+    ] = False,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", help="Per-file lines on stderr."),
+    ] = False,
 ) -> None:
-    """Drop and rebuild the index (Phase 6)."""
-    del yes
-    _stub("index rebuild", 6)
+    """Drop and rebuild the index for the current project.
+
+    Thin wrapper over :func:`code_index.indexer.build`. The user-facing
+    distinction from ``index build`` is the destructive ``--yes`` gate and
+    the absence of ``--root`` / ``--dry-run`` (per ``006/context.md``
+    decision 2 and ``002.context.md``). No pre-flight ``embed_model`` /
+    ``embed_dim`` check (decision 7): rebuild is the cure for model
+    mismatch, and the Phase 4 auto-rebuild drop sequence inside
+    :func:`code_index.indexer.build` will overwrite the persisted meta
+    keys anyway.
+
+    Without ``--yes`` the command raises :class:`CodeIndexError` with the
+    local-string kind ``"usage.confirmation_required"`` (see
+    ``002.context.md`` — kept as a raise-site literal rather than promoted
+    to :class:`Kinds` pending an architect's decision) and exit code 1.
+
+    Stdout summary matches ``index build``'s shape: ``--format text``
+    writes ``indexed <N> files, <M> chunks``; ``--format json`` writes the
+    :class:`code_index.indexer.IndexerResult` document.
+    """
+    ctx_obj: dict[str, Any] = ctx.obj or {}
+    format_value: str = ctx_obj.get("format", "text")
+    verbose_flag: bool = bool(verbose or ctx_obj.get("verbose", False))
+
+    if not yes:
+        raise CodeIndexError(
+            code=EXIT_USAGE,
+            kind="usage.confirmation_required",
+            message=(
+                "`index rebuild` is destructive; re-run with `--yes` to "
+                "confirm dropping and rebuilding the index"
+            ),
+            detail={"subcommand": "index rebuild"},
+        )
+
+    config_path: Path = _resolve_config_path(ctx)
+    cfg: CodeIndexConfig = load_config(config_path)
+    project_root: Path = config_path.parent.parent.parent.resolve()
+
+    result = indexer.build(
+        cfg, project_root, dry_run=False, verbose=verbose_flag
+    )
+
+    if format_value == "json":
+        payload: dict[str, Any] = {
+            "files_walked": result.files_walked,
+            "files_chunked": result.files_chunked,
+            "chunks_inserted": result.chunks_inserted,
+            "symbols_inserted": result.symbols_inserted,
+            "edges_inserted": result.edges_inserted,
+            "seconds_elapsed": result.seconds_elapsed,
+        }
+        write_json_stdout(payload)
+        return
+
+    write_result_stdout(
+        f"indexed {result.files_chunked} files, {result.chunks_inserted} chunks"
+    )
 
 
 class _SearchMode(enum.StrEnum):
@@ -470,36 +566,368 @@ def _write_search_text(results: list[SearchResult], *, verbose: bool) -> None:
 
 
 @symbols_app.command("defs")
-def cli_symbols_defs(name: str) -> None:
-    """Symbol definitions matching ``name`` (Phase 6)."""
-    del name
-    _stub("symbols defs", 6)
+def cli_symbols_defs(
+    ctx: typer.Context,
+    name: str,
+    exact: Annotated[
+        bool, typer.Option("--exact", help="Match symbol name by exact equality.")
+    ] = False,
+    lang: Annotated[
+        str | None,
+        typer.Option("--lang", help="Restrict to one canonical language name."),
+    ] = None,
+) -> None:
+    """Symbol definitions matching ``name``.
+
+    Runs the Phase 6 pre-flight (discover config, verify the index file
+    exists, verify ``meta.embed_model`` / ``meta.embed_dim`` match the
+    configured backend) then calls :func:`code_index.symbols.query_symbols`
+    with ``kind="def"``. Matching is case-sensitive substring by default;
+    ``--exact`` switches to equality. Empty results exit 0 with empty stdout
+    (text) or ``[]`` (JSON) — zero results is not an error per ``cli.md``.
+    """
+    _run_symbols_query(ctx, name, kind="def", exact=exact, language=lang)
 
 
 @symbols_app.command("refs")
-def cli_symbols_refs(name: str) -> None:
-    """Symbol references matching ``name`` (Phase 6)."""
-    del name
-    _stub("symbols refs", 6)
+def cli_symbols_refs(
+    ctx: typer.Context,
+    name: str,
+    exact: Annotated[
+        bool, typer.Option("--exact", help="Match symbol name by exact equality.")
+    ] = False,
+    lang: Annotated[
+        str | None,
+        typer.Option("--lang", help="Restrict to one canonical language name."),
+    ] = None,
+) -> None:
+    """Symbol references matching ``name``.
+
+    Same surface as ``symbols defs`` with ``kind="ref"``; see that command
+    for matching semantics and pre-flight behavior.
+    """
+    _run_symbols_query(ctx, name, kind="ref", exact=exact, language=lang)
+
+
+def _run_symbols_query(
+    ctx: typer.Context,
+    name: str,
+    *,
+    kind: str,
+    exact: bool,
+    language: str | None,
+) -> None:
+    """Shared body of ``symbols defs`` and ``symbols refs``.
+
+    Pre-flight + query + emit. The ``_preflight`` helper returns a connection
+    the caller owns; we close it on every code path via ``try`` / ``finally``.
+    """
+    ctx_obj: dict[str, Any] = ctx.obj or {}
+    format_value: str = ctx_obj.get("format", "text")
+
+    _cfg, _project_root, conn, _backend = _preflight(ctx)
+    try:
+        hits: list[symbols_module.SymbolHit] = symbols_module.query_symbols(
+            conn, name, kind=kind, exact=exact, language=language
+        )
+    finally:
+        conn.close()
+
+    if format_value == "json":
+        _write_symbols_json(hits)
+    else:
+        _write_symbols_text(hits)
+
+
+def _write_symbols_json(hits: list[symbols_module.SymbolHit]) -> None:
+    """Emit the JSON-array shape pinned in ``context.md`` ("JSON output shapes").
+
+    Each element has exactly the keys ``{path, scope, language, name, line}``;
+    an empty result emits ``[]``.
+    """
+    payload: list[dict[str, Any]] = [
+        {
+            "path": hit.path,
+            "scope": hit.scope,
+            "language": hit.language,
+            "name": hit.name,
+            "line": hit.line,
+        }
+        for hit in hits
+    ]
+    write_json_stdout(payload)
+
+
+def _write_symbols_text(hits: list[symbols_module.SymbolHit]) -> None:
+    """One line per hit, empty stdout when ``hits`` is empty.
+
+    Format per ``003.context.md`` ("Text output format")::
+
+        <path>:<line> [<language>] <name>      (scope: <scope>)
+
+    When ``scope`` is ``None`` the trailing parenthesized clause is omitted.
+    The exact spacing is not contractual (text is for humans; JSON is the
+    stable surface).
+    """
+    if not hits:
+        return
+    lines: list[str] = []
+    for hit in hits:
+        line: str = f"{hit.path}:{hit.line} [{hit.language}] {hit.name}"
+        if hit.scope is not None:
+            line += f"      (scope: {hit.scope})"
+        lines.append(line)
+    write_result_stdout("\n".join(lines))
 
 
 @graph_app.command("callers")
-def cli_graph_callers(symbol: str) -> None:
-    """Callers of ``symbol`` (Phase 6)."""
-    del symbol
-    _stub("graph callers", 6)
+def cli_graph_callers(
+    ctx: typer.Context,
+    symbol: str,
+    exact: Annotated[
+        bool, typer.Option("--exact", help="Match dst_name by exact equality.")
+    ] = False,
+    lang: Annotated[
+        str | None,
+        typer.Option("--lang", help="Restrict to one canonical language name."),
+    ] = None,
+) -> None:
+    """Edges whose ``dst_name`` matches ``symbol``.
+
+    Runs the Phase 6 pre-flight (discover config, verify the index file
+    exists, verify ``meta.embed_model`` / ``meta.embed_dim`` match the
+    configured backend) then calls :func:`code_index.graph.query_callers`.
+    Matching is case-sensitive substring by default; ``--exact`` switches to
+    equality. The ``symbol`` argument is matched against ``edges.dst_name``
+    directly — no resolution to a ``symbols`` row is performed (per
+    ``004.context.md`` "Edge resolution is lazy"). Empty results exit 0
+    with empty stdout (text) or ``[]`` (JSON).
+    """
+    ctx_obj: dict[str, Any] = ctx.obj or {}
+    format_value: str = ctx_obj.get("format", "text")
+
+    _cfg, _project_root, conn, _backend = _preflight(ctx)
+    try:
+        hits: list[graph_module.CallerHit] = graph_module.query_callers(
+            conn, symbol, exact=exact, language=lang
+        )
+    finally:
+        conn.close()
+
+    if format_value == "json":
+        _write_callers_json(hits)
+    else:
+        _write_callers_text(hits)
 
 
 @graph_app.command("deps")
-def cli_graph_deps(path: str) -> None:
-    """Dependencies of ``path`` (Phase 6)."""
-    del path
-    _stub("graph deps", 6)
+def cli_graph_deps(
+    ctx: typer.Context,
+    path: str,
+    lang: Annotated[
+        str | None,
+        typer.Option("--lang", help="Restrict to one canonical language name."),
+    ] = None,
+) -> None:
+    """Outbound edges from chunks whose ``chunks.path`` equals ``path``.
+
+    Runs the Phase 6 pre-flight (discover config, verify the index file
+    exists, verify ``meta.embed_model`` / ``meta.embed_dim`` match the
+    configured backend) then calls :func:`code_index.graph.query_deps`.
+
+    Path matching is case-sensitive equality (decision 4 in ``context.md``):
+    no substring, no globbing. The path must match exactly; use the
+    forward-slash relative path printed by ``index sync`` or stored in
+    ``chunks.path``. Unresolved ``dst_name`` values are included in the
+    result (the contract allows them). Empty results exit 0 with empty
+    stdout (text) or ``[]`` (JSON).
+    """
+    ctx_obj: dict[str, Any] = ctx.obj or {}
+    format_value: str = ctx_obj.get("format", "text")
+
+    _cfg, _project_root, conn, _backend = _preflight(ctx)
+    try:
+        hits: list[graph_module.DepHit] = graph_module.query_deps(
+            conn, path, language=lang
+        )
+    finally:
+        conn.close()
+
+    if format_value == "json":
+        _write_deps_json(hits)
+    else:
+        _write_deps_text(hits)
+
+
+def _write_callers_json(hits: list[graph_module.CallerHit]) -> None:
+    """Emit the JSON-array shape pinned in ``context.md`` ("JSON output shapes").
+
+    Each element has exactly the keys
+    ``{path, scope, language, start_line, kind, dst_name}``; an empty result
+    emits ``[]``.
+    """
+    payload: list[dict[str, Any]] = [
+        {
+            "path": hit.path,
+            "scope": hit.scope,
+            "language": hit.language,
+            "start_line": hit.start_line,
+            "kind": hit.kind,
+            "dst_name": hit.dst_name,
+        }
+        for hit in hits
+    ]
+    write_json_stdout(payload)
+
+
+def _write_callers_text(hits: list[graph_module.CallerHit]) -> None:
+    """One line per hit, empty stdout when ``hits`` is empty.
+
+    Format per ``004.graph.md`` ("CLI wrapper behavior")::
+
+        <path>:<start_line> [<language>] -> <dst_name> (<kind>) (scope: <scope>)
+
+    When ``scope`` is ``None`` the trailing parenthesized ``(scope: ...)``
+    clause is omitted. The exact spacing is not contractual (text is for
+    humans; JSON is the stable surface).
+    """
+    if not hits:
+        return
+    lines: list[str] = []
+    for hit in hits:
+        line: str = (
+            f"{hit.path}:{hit.start_line} [{hit.language}] "
+            f"-> {hit.dst_name} ({hit.kind})"
+        )
+        if hit.scope is not None:
+            line += f" (scope: {hit.scope})"
+        lines.append(line)
+    write_result_stdout("\n".join(lines))
+
+
+def _write_deps_json(hits: list[graph_module.DepHit]) -> None:
+    """Emit the JSON-array shape pinned in ``context.md`` ("JSON output shapes").
+
+    Each element has exactly the keys ``{path, kind, dst_name, meta}``; an
+    empty result emits ``[]``. ``meta`` is the raw JSON string from the
+    column or ``null`` per ``004.context.md``.
+    """
+    payload: list[dict[str, Any]] = [
+        {
+            "path": hit.path,
+            "kind": hit.kind,
+            "dst_name": hit.dst_name,
+            "meta": hit.meta,
+        }
+        for hit in hits
+    ]
+    write_json_stdout(payload)
+
+
+def _write_deps_text(hits: list[graph_module.DepHit]) -> None:
+    """One line per hit, empty stdout when ``hits`` is empty.
+
+    Format per ``004.graph.md`` ("CLI wrapper behavior")::
+
+        <path> -> <dst_name> (<kind>)
+
+    ``meta`` is intentionally omitted from the human output — per
+    ``004.context.md`` the JSON channel is the place to consume ``meta``.
+    """
+    if not hits:
+        return
+    lines: list[str] = []
+    for hit in hits:
+        lines.append(f"{hit.path} -> {hit.dst_name} ({hit.kind})")
+    write_result_stdout("\n".join(lines))
 
 
 # ---------------------------------------------------------------------------
 # Real implementation: `config show`.
 # ---------------------------------------------------------------------------
+
+
+def _preflight(
+    ctx: typer.Context,
+) -> tuple[CodeIndexConfig, Path, sqlite3.Connection, embeddings.EmbeddingBackend]:
+    """Run the standard Phase 6 pre-flight for ``index sync`` / ``symbols`` / ``graph``.
+
+    Steps (matching ``006/context.md`` "Cross-cutting constraints"):
+
+    1. Discover the config (``--config`` override or upward walk).
+    2. Load the config; resolve the project root and the index path.
+    3. If ``docs/.helpers/index.sqlite`` does not exist, raise
+       :class:`CodeIndexError` with :attr:`Kinds.INDEX_MISSING` (code 12).
+    4. Open the index (no schema-version drift handling here — the
+       :func:`storage.open_index` helper raises :attr:`Kinds.INDEX_SCHEMA_MISMATCH`
+       on its own).
+    5. Construct the embedding backend (native exceptions from
+       :func:`embeddings.from_config` propagate per decision 6).
+    6. Compare ``meta.embed_model`` and ``meta.embed_dim`` against the
+       backend's ``name`` / ``dim``; mismatch raises
+       :attr:`Kinds.INDEX_EMBED_MODEL_MISMATCH` or
+       :attr:`Kinds.INDEX_EMBED_DIM_MISMATCH` (code 11) with a message
+       pointing at ``code_index index rebuild``.
+
+    Returns the tuple ``(config, project_root, conn, backend)``. The caller
+    owns closing ``conn``. Steps 003 and 004 will reuse this helper as-is —
+    the ``backend`` argument is unused by ``symbols`` / ``graph`` but
+    constructing it is cheap once fastembed is cached, and the model/dim
+    check requires its ``name`` and ``dim`` anyway.
+    """
+    config_path: Path = _resolve_config_path(ctx)
+    cfg: CodeIndexConfig = load_config(config_path)
+    project_root: Path = config_path.parent.parent.parent.resolve()
+    db_path: Path = project_root / "docs" / ".helpers" / "index.sqlite"
+    if not db_path.exists():
+        raise CodeIndexError(
+            code=EXIT_INDEX_MISSING,
+            kind=Kinds.INDEX_MISSING,
+            message=(
+                f"no index found at {db_path.as_posix()}; "
+                "run `code_index index build`"
+            ),
+            detail={"path": db_path.as_posix()},
+        )
+
+    conn = open_index(db_path)
+    try:
+        backend = embeddings.from_config(cfg)
+        stored_model: str | None = get_meta(conn, "embed_model")
+        stored_dim: str | None = get_meta(conn, "embed_dim")
+        if stored_model != backend.name:
+            raise CodeIndexError(
+                code=EXIT_INDEX_MODEL,
+                kind=Kinds.INDEX_EMBED_MODEL_MISMATCH,
+                message=(
+                    f"index built with embed_model={stored_model!r}, "
+                    f"config wants {backend.name!r}; "
+                    "run `code_index index rebuild`"
+                ),
+                detail={
+                    "stored": stored_model,
+                    "configured": backend.name,
+                },
+            )
+        if stored_dim != str(backend.dim):
+            raise CodeIndexError(
+                code=EXIT_INDEX_MODEL,
+                kind=Kinds.INDEX_EMBED_DIM_MISMATCH,
+                message=(
+                    f"index built with embed_dim={stored_dim!r}, "
+                    f"config wants {backend.dim!r}; "
+                    "run `code_index index rebuild`"
+                ),
+                detail={
+                    "stored": stored_dim,
+                    "configured": str(backend.dim),
+                },
+            )
+    except BaseException:
+        conn.close()
+        raise
+
+    return cfg, project_root, conn, backend
 
 
 def _resolve_config_path(ctx: typer.Context) -> Path:

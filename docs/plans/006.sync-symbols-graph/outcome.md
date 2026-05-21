@@ -40,3 +40,5 @@ These were considered and explicitly rejected:
 ## Observations
 
 _populated by the coder as steps complete_
+
+- Step 002: `index rebuild` raises `CodeIndexError` with the raw kind string `"usage.confirmation_required"` at the single raise site in `cli.py`. The corresponding `Kinds.*` entry was intentionally not added (per `002.context.md`). Possible impact: if the architect picks up the candidate update to `docs/architecture/errors-and-exit-codes.md` (code 1 row) and adds `Kinds.USAGE_CONFIRMATION_REQUIRED`, the raise site in `cli.cli_index_rebuild` should be flipped to reference the registry constant.

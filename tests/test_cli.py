@@ -187,42 +187,17 @@ def test_config_show_failure_envelope(
 
 # ---------------------------------------------------------------------------
 # DoD-4 — every stub exits 1 with kind = "cli.not_implemented".
+#
+# All MVP subcommands have real implementations as of Phase 6 step 004 —
+# ``init`` / ``index build`` (Phase 4 steps 002 / 004), ``search`` (Phase 5
+# step 002), ``index sync`` / ``index rebuild`` / ``symbols defs|refs`` /
+# ``graph callers|deps`` (Phase 6 steps 001 / 002 / 003 / 004). With no
+# remaining stubs there is nothing to assert here; the ``_stub`` helper and
+# ``Kinds.CLI_NOT_IMPLEMENTED`` constant are still exercised by their
+# direct callers in earlier-phase tests and by ``code_index.errors`` unit
+# tests. If a future phase reintroduces a stub, restore the parametrize
+# block.
 # ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    "argv",
-    [
-        # ``init`` and ``index build`` are real implementations as of Phase 4
-        # (steps 002 and 004); ``search`` is real as of Phase 5 step 002 —
-        # their entries were removed from this parametrize.
-        ["index", "sync"],
-        ["index", "rebuild"],
-        ["symbols", "defs", "foo"],
-        ["symbols", "refs", "foo"],
-        ["graph", "callers", "foo"],
-        ["graph", "deps", "foo"],
-    ],
-)
-def test_stub_subcommands_envelope(
-    argv: list[str], capsys: pytest.CaptureFixture[str]
-) -> None:
-    code, out, _err = _run(["--format", "json", *argv], capsys)
-    assert code == 1
-    payload: dict[str, Any] = json.loads(out)
-    assert payload["error"]["code"] == 1
-    assert payload["error"]["kind"] == "cli.not_implemented"
-
-
-def test_stub_text_mode_stderr_only(capsys: pytest.CaptureFixture[str]) -> None:
-    # ``index sync`` is still a stub in Phase 4 (lands in Phase 6); use it
-    # in place of the now-implemented ``init`` to exercise text-mode stub
-    # output.
-    code, out, err = _run(["index", "sync"], capsys)
-    assert code == 1
-    # Text mode: nothing on stdout, summary on stderr.
-    assert out == ""
-    assert "cli.not_implemented" in err
 
 
 # ---------------------------------------------------------------------------
