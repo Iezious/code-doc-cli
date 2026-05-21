@@ -15,7 +15,9 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+from code_index.embeddings import EmbeddingBackend
 from code_index.errors import (
+    EXIT_INDEX_MODEL,
     EXIT_INDEX_SCHEMA,
     CodeIndexError,
     Kinds,
@@ -156,9 +158,68 @@ def open_index(
     return conn
 
 
+def verify_index_compat(
+    conn: sqlite3.Connection,
+    backend: EmbeddingBackend,
+) -> None:
+    """Verify ``meta.embed_model`` and ``meta.embed_dim`` match ``backend``.
+
+    Raises :class:`CodeIndexError` with ``code = 11`` and the appropriate
+    kind when the persisted embedding contract drifts from the runtime
+    backend:
+
+    - ``meta.embed_model != backend.name`` ->
+      ``Kinds.INDEX_EMBED_MODEL_MISMATCH``.
+    - ``meta.embed_dim != str(backend.dim)`` ->
+      ``Kinds.INDEX_EMBED_DIM_MISMATCH``.
+    - Missing ``embed_model`` (or missing ``meta`` row entirely) is treated
+      as a model mismatch: the index predates the embed-model write
+      contract, so the message points the user at
+      ``code_index index rebuild``.
+
+    Returns ``None`` on a match.
+    """
+    found_model = get_meta(conn, "embed_model")
+    if found_model is None:
+        raise CodeIndexError(
+            EXIT_INDEX_MODEL,
+            Kinds.INDEX_EMBED_MODEL_MISMATCH,
+            (
+                "index has no embed_model recorded; run "
+                "`code_index index rebuild` to rebuild with the current backend"
+            ),
+            {"expected": backend.name, "found": None},
+        )
+
+    if found_model != backend.name:
+        raise CodeIndexError(
+            EXIT_INDEX_MODEL,
+            Kinds.INDEX_EMBED_MODEL_MISMATCH,
+            (
+                f"index embed_model {found_model!r} does not match backend "
+                f"{backend.name!r}; run `code_index index rebuild`"
+            ),
+            {"expected": backend.name, "found": found_model},
+        )
+
+    found_dim = get_meta(conn, "embed_dim")
+    expected_dim = str(backend.dim)
+    if found_dim != expected_dim:
+        raise CodeIndexError(
+            EXIT_INDEX_MODEL,
+            Kinds.INDEX_EMBED_DIM_MISMATCH,
+            (
+                f"index embed_dim {found_dim!r} does not match backend dim "
+                f"{expected_dim!r}; run `code_index index rebuild`"
+            ),
+            {"expected": expected_dim, "found": found_dim},
+        )
+
+
 __all__ = [
     "CURRENT_SCHEMA_VERSION",
     "get_meta",
     "open_index",
     "set_meta",
+    "verify_index_compat",
 ]

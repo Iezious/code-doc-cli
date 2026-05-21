@@ -194,11 +194,10 @@ def test_config_show_failure_envelope(
     "argv",
     [
         # ``init`` and ``index build`` are real implementations as of Phase 4
-        # (steps 002 and 004); their entries were removed from this
-        # parametrize.
+        # (steps 002 and 004); ``search`` is real as of Phase 5 step 002 —
+        # their entries were removed from this parametrize.
         ["index", "sync"],
         ["index", "rebuild"],
-        ["search", "foo"],
         ["symbols", "defs", "foo"],
         ["symbols", "refs", "foo"],
         ["graph", "callers", "foo"],

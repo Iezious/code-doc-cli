@@ -21,6 +21,7 @@ in :mod:`code_index.errors``.
 
 from __future__ import annotations
 
+import enum
 import sys
 from pathlib import Path
 from typing import Annotated, Any
@@ -28,9 +29,11 @@ from typing import Annotated, Any
 import click
 import typer
 
-from code_index import indexer
+from code_index import embeddings, indexer, storage
+from code_index import search as search_module
 from code_index.config import CodeIndexConfig, discover_config_path, load_config
 from code_index.errors import (
+    EXIT_CONFIG,
     EXIT_INDEX_MISSING,
     EXIT_UNKNOWN,
     EXIT_USAGE,
@@ -42,6 +45,8 @@ from code_index.errors import (
     write_result_stdout,
 )
 from code_index.init import write_skeleton
+from code_index.languages.registry import active_plugins
+from code_index.search import SearchFilters, SearchResult
 
 # Synthesized kind for unhandled exceptions; documented in the DoD-5 test.
 _UNKNOWN_KIND: str = "unknown"
@@ -260,11 +265,208 @@ def cli_index_rebuild(
     _stub("index rebuild", 6)
 
 
+class _SearchMode(enum.StrEnum):
+    """``--mode`` enum.
+
+    :class:`enum.StrEnum` (Python 3.11+) gives the members native ``str``
+    behavior so Typer renders the values as bare strings on ``--help`` and
+    accepts the literal ``"bm25"`` / ``"dense"`` / ``"hybrid"`` on the
+    command line. Unknown values surface as Typer's native usage error
+    (exit code 2). Per ``002.context.md`` this is the recommended path
+    over a hand-rolled :data:`Kinds.CONFIG_BAD_ENUM` raise — the
+    Typer-level rejection already satisfies the contract.
+    """
+
+    bm25 = "bm25"
+    dense = "dense"
+    hybrid = "hybrid"
+
+
 @app.command("search")
-def cli_search(query: str) -> None:
-    """Hybrid BM25 + dense retrieval (Phase 5)."""
-    del query
-    _stub("search", 5)
+def cli_search(
+    ctx: typer.Context,
+    query: Annotated[str, typer.Argument(help="Free-text query string.")],
+    lang: Annotated[
+        str | None,
+        typer.Option("--lang", help="Restrict to one canonical language name."),
+    ] = None,
+    k: Annotated[
+        int, typer.Option("--k", min=1, help="Maximum results returned.")
+    ] = 20,
+    bm25_k: Annotated[
+        int,
+        typer.Option("--bm25-k", min=1, help="BM25 candidate-pool size before fusion."),
+    ] = 100,
+    dense_k: Annotated[
+        int,
+        typer.Option(
+            "--dense-k", min=1, help="Dense candidate-pool size before fusion."
+        ),
+    ] = 100,
+    kind: Annotated[
+        str | None,
+        typer.Option("--kind", help="Restrict to one chunk-kind value."),
+    ] = None,
+    path: Annotated[
+        str | None,
+        typer.Option("--path", help="GLOB pattern applied to chunks.path."),
+    ] = None,
+    mode: Annotated[
+        _SearchMode,
+        typer.Option("--mode", help="bm25|dense|hybrid", case_sensitive=False),
+    ] = _SearchMode.hybrid,
+) -> None:
+    """Hybrid BM25 + dense retrieval over the per-project index.
+
+    Flag table (full) per ``docs/architecture/cli.md``. ``--format``,
+    ``--config``, ``--verbose``, ``--quiet`` ride on the shared app
+    callback (Phase 1) and are read off ``ctx.obj``.
+
+    Behavior:
+
+    1. Resolves the config (``--config`` override or upward discovery).
+    2. Validates ``--lang`` against the active language registry; unknown
+       values raise :class:`CodeIndexError` with
+       :attr:`Kinds.CONFIG_UNKNOWN_LANGUAGE` (code 2).
+    3. Resolves ``<project_root>/docs/.helpers/index.sqlite``; missing
+       index raises :class:`CodeIndexError` with :attr:`Kinds.INDEX_MISSING`
+       (code 12) pointing the user at ``code_index init`` and
+       ``code_index index build``.
+    4. Opens the index via :func:`storage.open_index` with
+       ``create_if_missing=False``. Schema-version drift surfaces from
+       there as :attr:`Kinds.INDEX_SCHEMA_MISMATCH` (code 10).
+    5. For ``--mode dense`` and ``--mode hybrid``, instantiates the
+       embedding backend via :func:`embeddings.from_config` and runs
+       :func:`storage.verify_index_compat` before search. ``--mode bm25``
+       skips both — the embedding backend is never loaded.
+    6. Runs :func:`search_module.search` with the parsed filters.
+    7. Writes results to stdout: text stanzas under ``--format text``
+       (default) or one ``{"results": [...]}`` document under
+       ``--format json``. Zero results: empty stdout under text, exactly
+       ``{"results": []}`` under JSON.
+
+    :class:`CodeIndexError` raised anywhere in this function propagates to
+    the Phase 1 boundary handler — never caught and rewrapped here.
+    """
+    ctx_obj: dict[str, Any] = ctx.obj or {}
+    format_value: str = ctx_obj.get("format", "text")
+    verbose_flag: bool = bool(ctx_obj.get("verbose", False))
+
+    config_path: Path = _resolve_config_path(ctx)
+    cfg: CodeIndexConfig = load_config(config_path)
+
+    if lang is not None:
+        known_names: list[str] = active_plugins(cfg).names()
+        if lang not in known_names:
+            raise CodeIndexError(
+                code=EXIT_CONFIG,
+                kind=Kinds.CONFIG_UNKNOWN_LANGUAGE,
+                message=(
+                    f"unknown --lang {lang!r}; "
+                    f"known languages: {', '.join(known_names)}"
+                ),
+                detail={"requested": lang, "known": known_names},
+            )
+
+    project_root: Path = config_path.parent.parent.parent.resolve()
+    db_path: Path = project_root / "docs" / ".helpers" / "index.sqlite"
+    if not db_path.exists():
+        raise CodeIndexError(
+            code=EXIT_INDEX_MISSING,
+            kind=Kinds.INDEX_MISSING,
+            message=(
+                "no index found at "
+                f"{db_path.as_posix()}; "
+                "run `code_index init` then `code_index index build`"
+            ),
+            detail={"path": db_path.as_posix()},
+        )
+
+    conn = storage.open_index(
+        db_path, create_if_missing=False, check_version=True
+    )
+    try:
+        backend: embeddings.EmbeddingBackend | None = None
+        if mode is not _SearchMode.bm25:
+            backend = embeddings.from_config(cfg)
+            storage.verify_index_compat(conn, backend)
+
+        # ``_SearchMode`` is a :class:`enum.StrEnum`; ``.value`` typechecks
+        # as the ``Mode`` literal (the enum's members exactly cover its
+        # three values), so no cast is needed.
+        results: list[SearchResult] = search_module.search(
+            conn,
+            query,
+            backend=backend,
+            mode=mode.value,
+            k=k,
+            bm25_k=bm25_k,
+            dense_k=dense_k,
+            filters=SearchFilters(lang=lang, kind=kind, path_glob=path),
+        )
+    finally:
+        conn.close()
+
+    if format_value == "json":
+        _write_search_json(results)
+    else:
+        _write_search_text(results, verbose=verbose_flag)
+
+
+def _write_search_json(results: list[SearchResult]) -> None:
+    """Emit ``{"results": [...]}`` with all nine ``SearchResult`` fields."""
+    payload: dict[str, Any] = {
+        "results": [
+            {
+                "path": row.path,
+                "start_line": row.start_line,
+                "end_line": row.end_line,
+                "language": row.language,
+                "kind": row.kind,
+                "name": row.name,
+                "scope": row.scope,
+                "excerpt": row.excerpt,
+                "score": row.score,
+            }
+            for row in results
+        ]
+    }
+    write_json_stdout(payload)
+
+
+def _write_search_text(results: list[SearchResult], *, verbose: bool) -> None:
+    """Emit one stanza per result; zero results writes nothing on stdout.
+
+    Stanza shape::
+
+        <path>:<start>-<end>  [<language>] <kind> <name or "">
+          score=<float>          # only under --verbose
+          <scope>                # only when scope is non-None
+          <excerpt indented two spaces>
+
+    Stanzas are separated by a single blank line. Under text mode zero
+    results means nothing is written to stdout — the contract from
+    ``cli.md`` and ``retrieval.md``.
+    """
+    if not results:
+        return
+
+    stanzas: list[str] = []
+    for row in results:
+        header: str = (
+            f"{row.path}:{row.start_line}-{row.end_line}  "
+            f"[{row.language}] {row.kind} {row.name or ''}"
+        )
+        lines: list[str] = [header]
+        if verbose:
+            lines.append(f"  score={row.score}")
+        if row.scope is not None:
+            lines.append(f"  {row.scope}")
+        for excerpt_line in row.excerpt.splitlines():
+            lines.append(f"  {excerpt_line}")
+        stanzas.append("\n".join(lines))
+
+    write_result_stdout("\n\n".join(stanzas))
 
 
 @symbols_app.command("defs")

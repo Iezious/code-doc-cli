@@ -76,3 +76,13 @@ to `docs/architecture/*.md` during finalization and appends an
 ## Observations
 
 _Populated by the coder as steps complete._
+
+- Step 002: Dense (and therefore hybrid) mode always surfaces the top-`dense_k`
+  nearest neighbors regardless of relevance, so "zero results" under hybrid
+  mode is unreachable for any query that produces a valid embedding. The
+  Phase 5 DoD bullet "Zero results, text mode" is only satisfiable under
+  `--mode bm25` (FTS5 returns zero rows for an out-of-corpus token).
+  Possible impact: add a sentence to `docs/architecture/retrieval.md`
+  noting that the dense pool has no relevance floor — operators relying on
+  "no output = nothing relevant" must use `--mode bm25`, or wait for a
+  Phase 7 score threshold.
