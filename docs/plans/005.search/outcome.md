@@ -86,3 +86,10 @@ _Populated by the coder as steps complete._
   noting that the dense pool has no relevance floor — operators relying on
   "no output = nothing relevant" must use `--mode bm25`, or wait for a
   Phase 7 score threshold.
+
+## Applied 2026-05-21
+
+- storage.md: added "Compat check: verify_index_compat" subsection.
+- cli.md: replaced search "--format json" one-liner with the pinned JSON shape block (Phase 5 contract).
+- retrieval.md: appended dense-no-floor note under "Candidate pool sizes" (covers coder observation on step 002).
+- errors-and-exit-codes.md, rest of retrieval.md: no changes (per outcome).

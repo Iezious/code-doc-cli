@@ -114,6 +114,10 @@ Consequences:
 
 An embedding cache keyed by chunk content hash is **deferred** (see [mvp-scope](mvp-scope.md)). The supporting `chunks.content_hash` column lands together with the cache feature via a schema bump, not as a dormant column.
 
+### Compat check: verify_index_compat
+
+`code_index.storage` exports `verify_index_compat(conn, backend) -> None`. It raises `index.embed_model_mismatch` (code 11) when `meta.embed_model` differs from `backend.name`, and `index.embed_dim_mismatch` (code 11) when `meta.embed_dim` differs from `str(backend.dim)`. Missing `embed_model` or `embed_dim` keys in `meta` are treated as a model mismatch and prompt for `code_index index rebuild`. Called by `search`, `index sync`, `symbols`, and `graph` before any read query that depends on embeddings being consistent with the configured backend, so the loud-fail check lives in one place rather than being duplicated per subcommand.
+
 ## Sync state
 
 The `files` table is the source of truth for "what we have indexed and at what mtime/size". `index build` populates it as each file is chunked and inserted; `index sync` joins the walked file set against it to decide what to re-embed, insert, or delete (see [architecture](architecture.md)'s "Sync" data-flow section). No git state is recorded — sync compares mtime and size only.

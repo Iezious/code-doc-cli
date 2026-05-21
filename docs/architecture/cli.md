@@ -38,6 +38,21 @@ Incremental update. For each project file, compares mtime and size against the `
 code_index index sync [--verbose]
 ```
 
+**JSON shape.** Under `--format json`, `index sync` emits one document with the shape pinned by Phase 6:
+
+```json
+{
+  "files_added": <int>,
+  "files_changed": <int>,
+  "files_unchanged": <int>,
+  "files_removed": <int>,
+  "chunks_inserted_total": <int>,
+  "seconds_elapsed": <float>
+}
+```
+
+Failures use the standard error envelope from [errors-and-exit-codes](errors-and-exit-codes.md).
+
 ### `code_index index rebuild`
 
 Drops and rebuilds. Required after embedding model changes.
@@ -45,6 +60,8 @@ Drops and rebuilds. Required after embedding model changes.
 ```
 code_index index rebuild [--yes]
 ```
+
+`--root` and `--dry-run` are intentionally not supported on `rebuild`; the command is a forced full rebuild against the configured roots. The flag surface is `--yes` plus the cross-cutting `--config`, `--verbose`, `--format`.
 
 ### `code_index search`
 
@@ -61,7 +78,27 @@ code_index search "<query>" [--lang <name>]
                          [--format text|json]
 ```
 
-`--format json` returns a stable JSON array, suitable for agent consumption.
+**JSON shape.** Under `--format json`, `search` emits one document with the shape pinned by Phase 5:
+
+```json
+{
+  "results": [
+    {
+      "path": "<string>",
+      "start_line": <int>,
+      "end_line": <int>,
+      "language": "<string>",
+      "kind": "<string>",
+      "name": "<string or null>",
+      "scope": "<string or null>",
+      "excerpt": "<string>",
+      "score": <float>
+    }
+  ]
+}
+```
+
+Zero results render as `{"results": []}` and still exit 0 — an empty result set is not an error. Failures use the standard error envelope from [errors-and-exit-codes](errors-and-exit-codes.md).
 
 ### `code_index symbols`
 
@@ -88,6 +125,8 @@ code_index graph deps <path>             # what this file/chunk depends on
 ```
 
 Graph subcommands accept the same `--lang` filter as `symbols`, and the `<symbol>` argument to `graph callers` follows the same substring-by-default, `--exact`-for-exact, case-sensitive rule (see [chunking-and-languages](chunking-and-languages.md), "Symbol identity").
+
+`graph deps <path>` matches `<path>` exactly against the project-root-relative `chunks.path` (forward slashes). No globbing, no substring. This mirrors the explicit substring-by-default / `--exact` rule already documented for `symbols` and `graph callers`.
 
 ### `code_index config show`
 

@@ -60,6 +60,8 @@ The default rendering is one result per stanza, prefixed by `path:start-end`, su
 
 Larger pools improve recall at the cost of query latency. Defaults are tuned for "fast enough that an agent calls this many times per pipeline run."
 
+The dense pool has **no relevance floor** — it always returns its top-`dense_k` nearest neighbors regardless of cosine similarity. Under `--mode hybrid` or `--mode dense`, any query that produces a valid embedding therefore returns a non-empty result set; "zero results" is reachable only under `--mode bm25`, where FTS5 returns zero rows for out-of-corpus tokens. Operators who rely on "no output = nothing relevant" must use `--mode bm25` (deferred; revisit when a score threshold is added).
+
 ## Latency budget
 
 - Cold queries (first after process start): dominated by SQLite open + extension load. Targets sub-second.

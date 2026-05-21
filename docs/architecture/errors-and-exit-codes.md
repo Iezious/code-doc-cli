@@ -74,8 +74,9 @@ Failures below are grouped by category. Each entry names the failure mode, the e
 
 - Unimplemented subcommand stub → `cli.not_implemented` (code 1). The `detail` payload includes `subcommand` (the dotted invocation, e.g. `"index build"`) and `phase` (the MVP phase number that lands the real implementation), so agents can dispatch on either.
 - The embeddings factory raises `cli.not_implemented` when `embed_backend = "voyage"`, until Phase 7 lands the real Voyage backend. The `detail` payload uses the same `subcommand`/`phase` keys for consistency, though `subcommand` here names the consuming surface (`"embeddings.from_config"`) rather than a CLI subcommand.
+- `index rebuild` invoked without `--yes` → `usage.confirmation_required` (code 1). `detail` includes `subcommand` (`"index rebuild"`).
 
-These entries are **transient**: each row is removed from this surface as Phases 4, 5, and 6 implement the corresponding subcommand. Once the MVP is complete, only the embeddings factory's voyage stub (see [embeddings](embeddings.md)) still raises this kind; that stub is itself removed when Phase 7 lands the Voyage backend.
+The `cli.not_implemented` entries are **transient**: each row is removed from this surface as Phases 4, 5, and 6 implement the corresponding subcommand. Once the MVP is complete, only the embeddings factory's voyage stub (see [embeddings](embeddings.md)) still raises this kind; that stub is itself removed when Phase 7 lands the Voyage backend. The `usage.confirmation_required` entry is **not transient** — it documents a real guard on `index rebuild` and persists past MVP.
 
 ### Config (code 2)
 
