@@ -179,6 +179,28 @@ code_index config show [--format text|json]
 
 `"index"` is `null` when the index file is absent; meta values inside the `"index"` block are strings (matching SQLite TEXT storage).
 
+### `code_index usage`
+
+Prints agent-facing manual pages packaged inside the wheel. The only subcommand whose primary output is markdown content rather than structured data.
+
+```
+code_index usage [<topic>] [--format text|json]
+```
+
+Bare `code_index usage` returns the `USAGE.md` index page. With a topic argument, it returns that topic's page. The topic catalog is fixed at 9 names: `usage`, `init`, `index-build`, `index-sync`, `index-rebuild`, `search`, `symbols`, `graph`, `config-show`. (Note `usage` as a topic value resolves to the same index page returned by the no-arg form, so the catalog is self-describing.) Unknown topic raises `cli.bad_enum` (code 1) — see [errors-and-exit-codes](errors-and-exit-codes.md).
+
+**JSON shape.** Under `--format json`, `usage` emits one document with the shape:
+
+```json
+{
+  "topic": "<resolved name>",
+  "content": "<markdown body>",
+  "available": ["usage", "init", "index-build", "index-sync", "index-rebuild", "search", "symbols", "graph", "config-show"]
+}
+```
+
+`content` is a raw markdown string; agents may render or display it directly. `available` is included so an agent can discover topics in one call.
+
 ### `code_index doctor`
 
 Intended to diagnose common problems in one place: missing extension, schema mismatch, model mismatch, stale index, missing API key for the configured backend.
@@ -195,7 +217,7 @@ Intended to diagnose common problems in one place: missing extension, schema mis
 
 - The CLI walks upward from the CWD looking for `docs/.helpers/config.toml`.
 - Found → all commands operate against that project.
-- Not found → most commands error with a pointer to `code_index init`. Some (`--help`, `config show --no-project`) work without a config.
+- Not found → most commands error with a pointer to `code_index init`. Some (`--help`, `usage`, `config show --no-project`) work without a config; `usage` is project-independent by design and reads only packaged resources.
 
 ## Output discipline
 

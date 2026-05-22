@@ -113,6 +113,15 @@ The walker is the first stage of the indexer pipeline; it decides which files re
 - Index files use SQLite WAL mode to allow read-during-write.
 - Embedding is the hot loop; batching is the main lever.
 
+## Packaging
+
+- The wheel is built by **hatchling** with `packages = ["src/code_index"]` in `pyproject.toml`.
+- Hatchling auto-includes non-Python files under declared `packages` in the wheel by default. Resources living **inside the package tree** (e.g. `src/code_index/usage/*.md`) ship automatically — no `force-include` rule needed.
+- `[tool.hatch.build.targets.wheel.force-include]` is reserved for resources living **outside the package tree** that must still ship inside the wheel (e.g. a top-level `LICENSE` or a `templates/` directory at repo root).
+- Adding `force-include` for in-package resources is harmful: hatchling writes the files twice, producing `UserWarning: Duplicate name:` lines during build.
+
+Lesson source: the `code_index usage` subcommand (fast feature 001, 2026-05-22) was the first packaged non-Python resource; the duplicate-entry warning surfaced during its initial build and resolved the policy.
+
 ## Non-goals
 
 - Distributed indexing.
