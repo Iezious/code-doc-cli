@@ -75,8 +75,9 @@ Failures below are grouped by category. Each entry names the failure mode, the e
 - Unimplemented subcommand stub → `cli.not_implemented` (code 1). The `detail` payload includes `subcommand` (the dotted invocation, e.g. `"index build"`) and `phase` (the MVP phase number that lands the real implementation), so agents can dispatch on either.
 - The embeddings factory raises `cli.not_implemented` when `embed_backend = "voyage"`, until Phase 7 lands the real Voyage backend. The `detail` payload uses the same `subcommand`/`phase` keys for consistency, though `subcommand` here names the consuming surface (`"embeddings.from_config"`) rather than a CLI subcommand.
 - `index rebuild` invoked without `--yes` → `usage.confirmation_required` (code 1). `detail` includes `subcommand` (`"index rebuild"`).
+- CLI flag value not in the flag's allowed enum → `cli.bad_enum` (code 1). Producer: `code_index search --mode <bad>`. `detail` includes `flag` (the flag name, e.g. `"--mode"`), `value` (the rejected value), and `expected` (the list of allowed values). Distinct from `config.bad_enum` (code 2), which covers TOML enum violations under `[code_index]`.
 
-The `cli.not_implemented` entries are **transient**: each row is removed from this surface as Phases 4, 5, and 6 implement the corresponding subcommand. Once the MVP is complete, only the embeddings factory's voyage stub (see [embeddings](embeddings.md)) still raises this kind; that stub is itself removed when Phase 7 lands the Voyage backend. The `usage.confirmation_required` entry is **not transient** — it documents a real guard on `index rebuild` and persists past MVP.
+The `cli.not_implemented` entries for unimplemented subcommand stubs have all been removed as Phases 4–6 landed those subcommands; the embeddings factory's voyage stub (see [embeddings](embeddings.md)) still raises this kind and persists until the Voyage backend lands per [roadmap](roadmap.md). The `usage.confirmation_required` entry is **not transient** — it documents a real guard on `index rebuild` and persists past MVP. The `cli.bad_enum` entry is also not transient.
 
 ### Config (code 2)
 
@@ -113,10 +114,12 @@ See [embeddings](embeddings.md) and [storage](storage.md).
 
 ### Embedding backend (codes 20, 21, 22)
 
-- fastembed model download failed → `backend.model_download_failed` (code 20).
-- Backend `encode` raised → `backend.encode_failed` (code 20).
+- fastembed model download / instantiation failure → `backend.model_download_failed` (code 20). Producer: `code_index.embeddings.from_config(...)` and `FastembedBackend.__init__`.
+- Backend `encode` raised → `backend.encode_failed` (code 20). Producer: `FastembedBackend.encode(...)`.
 - Reserved for future API-backend authentication failures → `backend.auth_failed` (code 21). MVP has no producer for this kind; the contract is reserved so future paid backends can adopt this code without renumbering.
 - Reserved for future API-backend rate-limit failures → `backend.rate_limited` (code 22). MVP has no producer for this kind; the contract is reserved so future paid backends can adopt this code without renumbering.
+
+Both `backend.model_download_failed` and `backend.encode_failed` wrap native fastembed exceptions; the native exception's `str(...)` and class name are preserved in `detail.cause` and `detail.type` respectively.
 
 See [embeddings](embeddings.md) for backend behavior.
 
@@ -155,4 +158,4 @@ For parsing and IO categories, default behavior is **skip the offending file, wa
 
 ## Open questions
 
-- Whether `cli.not_implemented` should be renamed (e.g. `feature.not_implemented`) or split into surface-specific kinds (`cli.not_implemented` + `backend.not_implemented`) before Phase 7. The kind was introduced as CLI-only in Phase 1; Phase 2 added a second consumer (the embeddings factory's voyage stub) outside the CLI surface, making the current name a slight category abuse. The rename, if it happens, must land before any further consumers are added. Defer the call to Phase 7's planning, when the Voyage backend either obsoletes the stub or motivates `backend.not_implemented`.
+- Whether `cli.not_implemented` should be renamed (e.g. `feature.not_implemented`) or split into surface-specific kinds (`cli.not_implemented` + `backend.not_implemented`) before Phase 7. The kind was introduced as CLI-only in Phase 1; Phase 2 added a second consumer (the embeddings factory's voyage stub) outside the CLI surface, making the current name a slight category abuse. The rename, if it happens, must land before any further consumers are added. Defer the call to whoever lands the Voyage backend (see [roadmap](roadmap.md)), when the Voyage backend either obsoletes the stub or motivates `backend.not_implemented`.

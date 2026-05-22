@@ -93,3 +93,7 @@ Phase 7 ships: full `config show` diagnostic body, pinned JSON shapes for `init`
 
 ## Observations
 
+---
+Status: Applied 2026-05-21
+Applied items: 6
+Rejected items: 0

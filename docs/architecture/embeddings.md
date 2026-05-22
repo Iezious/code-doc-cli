@@ -69,6 +69,7 @@ An embedding cache keyed by chunk content hash is **planned for v1.1 and not in 
 
 - The MVP install is fully offline after the first model download (~120MB cached under user home).
 - Embedding quality is **one axis** of retrieval quality; the other is BM25. See `retrieval.md` for how the two are fused.
+- Backend `__init__` and `encode` failures surface as `CodeIndexError` carrying `backend.model_download_failed` (code 20) and `backend.encode_failed` (code 20) respectively. Agents should distinguish by `kind` since both share code 20. See [errors-and-exit-codes](errors-and-exit-codes.md).
 
 ## Open questions
 

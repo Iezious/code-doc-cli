@@ -20,6 +20,19 @@ Initializes `docs/.helpers/` in the current project, writing a default `config.t
 code_index init [--name <project-name>] [--force]
 ```
 
+**JSON shape.** Under `--format json`, `init` emits one document with the shape:
+
+```json
+{
+  "config_path": "/abs/path/docs/.helpers/config.toml",
+  "gitignore_path": "/abs/path/docs/.helpers/.gitignore",
+  "project": "my-project",
+  "force_used": false
+}
+```
+
+`force_used` is `true` iff `--force` was passed AND an existing file was overwritten; `false` for fresh init or no-op `--force`. Failures use the standard error envelope from [errors-and-exit-codes](errors-and-exit-codes.md) (refuse-without-`--force` etc.).
+
 ### `code_index index build`
 
 Full index build. Walks roots from config, chunks, embeds, stores. Reports counts and timings.
@@ -136,7 +149,35 @@ Prints the resolved configuration (config file values merged with defaults) and 
 code_index config show [--format text|json]
 ```
 
-Phase 1 ships only the **resolved config** portion of the output (the config-file values merged with defaults plus `project_root` and `config_path`). The **index metadata** portion (`schema_version`, `embed_model`) lands in Phase 7 once the indexer has populated `meta` rows; until then, `config show` does not open any index file. See [mvp-phases](mvp-phases.md).
+`config show` is the only subcommand that does not refuse on a schema, model, or dim mismatch. Mismatches are reported (both the configured value and the stored `meta` value appear in the output) and the exit code stays 0. Use `config show` to diagnose drift; use `index rebuild` to resolve it.
+
+**JSON shape.** Under `--format json`, `config show` emits one document with the shape:
+
+```json
+{
+  "config": {
+    "version": "...",
+    "project": "...",
+    "project_root": "/abs/path",
+    "config_path": "/abs/path/docs/.helpers/config.toml",
+    "roots": ["..."],
+    "ignores": ["..."],
+    "languages": null,
+    "extra_languages": [],
+    "embed_backend": "fastembed",
+    "embed_model": "...",
+    "embed_batch_size": 32
+  },
+  "index": {
+    "schema_version": "1",
+    "code_index_version": "...",
+    "embed_model": "...",
+    "embed_dim": "768"
+  }
+}
+```
+
+`"index"` is `null` when the index file is absent; meta values inside the `"index"` block are strings (matching SQLite TEXT storage).
 
 ### `code_index doctor`
 
