@@ -32,7 +32,7 @@ code_index symbols refs <name> [--exact] [--lang <name>]
   - **LSL**: event handlers as `<state>.<event>`; user functions and globals by bare name.
 - Zero matches is success (exit 0) with `[]`.
 
-Full per-language detail in `docs/architecture/chunking-and-languages.md`.
+Full per-language detail in `../../../docs/architecture/chunking-and-languages.md`.
 
 ## Success JSON
 

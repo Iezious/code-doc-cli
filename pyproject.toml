@@ -1,6 +1,6 @@
 [project]
 name = "code_index"
-version = "0.1.0"
+version = "0.2.0"
 description = "Universal codebase index and hybrid semantic/lexical search for documentation generation"
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -31,6 +31,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/code_index"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/code_index/usage" = "code_index/usage"
 
 [tool.ruff]
 line-length = 100

@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import sys
+from importlib.resources import files as _resource_files
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -1205,6 +1206,106 @@ def cli_config_show(ctx: typer.Context) -> None:
         return
 
     write_result_stdout(_config_show_text(config_block, index_block))
+
+
+# ---------------------------------------------------------------------------
+# `usage` — read packaged manual pages.
+#
+# The 9 markdown files live at ``src/code_index/usage/*.md`` and ship inside
+# the wheel via the ``[tool.hatch.build.targets.wheel.force-include]`` rule
+# in ``pyproject.toml``. The catalog below is a fixed tuple; the first entry
+# (``"usage"``) maps to ``USAGE.md`` (the index page) and is also the default
+# topic when the argument is omitted.
+# ---------------------------------------------------------------------------
+
+
+#: Fixed catalog of usage topics. Order is contractual: the JSON ``available``
+#: field surfaces the tuple verbatim. The first entry (``"usage"``) is the
+#: index page and the default topic for bare ``code_index usage``.
+USAGE_TOPICS: tuple[str, ...] = (
+    "usage",
+    "init",
+    "index-build",
+    "index-sync",
+    "index-rebuild",
+    "search",
+    "symbols",
+    "graph",
+    "config-show",
+)
+
+
+def _load_usage_topic(topic: str) -> str:
+    """Read the packaged markdown body for ``topic``.
+
+    ``topic`` must be one of :data:`USAGE_TOPICS`; the special name ``"usage"``
+    maps to ``USAGE.md`` (the index page), every other name maps to
+    ``<topic>.md`` (sibling resources in the ``code_index.usage`` package).
+    Uses :func:`importlib.resources.files` so the same code path works for
+    both editable installs and built wheels.
+    """
+    filename: str = "USAGE.md" if topic == "usage" else f"{topic}.md"
+    resource = _resource_files("code_index") / "usage" / filename
+    return resource.read_text(encoding="utf-8")
+
+
+@app.command("usage")
+def cli_usage(
+    ctx: typer.Context,
+    topic: Annotated[
+        str | None,
+        typer.Argument(help="Usage topic to display; omit for the index page."),
+    ] = None,
+) -> None:
+    """Print a packaged usage manual page.
+
+    Bare ``code_index usage`` (no argument) prints ``USAGE.md`` — the index
+    page listing the eight per-subcommand detail pages. ``code_index usage
+    <name>`` prints the matching detail page; valid names are listed in
+    :data:`USAGE_TOPICS`. Unknown topics raise :class:`CodeIndexError` with
+    :attr:`Kinds.CLI_BAD_ENUM` (code 1) — same kind ``search --mode <bad>``
+    produces, with ``detail.flag = "<topic>"`` because the rejected value is
+    a positional argument rather than a long-flag.
+
+    Under ``--format text`` the markdown body is written verbatim to stdout.
+    Under ``--format json`` stdout carries one document
+    ``{"topic", "content", "available"}`` where ``available`` is the full
+    catalog in declared order.
+
+    ``usage`` does not gate on a discovered ``docs/.helpers/config.toml`` —
+    it reads packaged resources only and is safe to invoke against any cwd.
+    """
+    ctx_obj: dict[str, Any] = ctx.obj or {}
+    format_value: str = ctx_obj.get("format", "text")
+
+    resolved_topic: str = topic if topic is not None else "usage"
+    if resolved_topic not in USAGE_TOPICS:
+        raise CodeIndexError(
+            code=EXIT_USAGE,
+            kind=Kinds.CLI_BAD_ENUM,
+            message=(
+                f"unknown topic: {resolved_topic!r}; expected one of: "
+                f"{', '.join(USAGE_TOPICS)}"
+            ),
+            detail={
+                "flag": "<topic>",
+                "value": resolved_topic,
+                "expected": list(USAGE_TOPICS),
+            },
+        )
+
+    content: str = _load_usage_topic(resolved_topic)
+
+    if format_value == "json":
+        payload: dict[str, Any] = {
+            "topic": resolved_topic,
+            "content": content,
+            "available": list(USAGE_TOPICS),
+        }
+        write_json_stdout(payload)
+        return
+
+    write_result_stdout(content)
 
 
 # ---------------------------------------------------------------------------

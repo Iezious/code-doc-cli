@@ -18,7 +18,7 @@ code_index init [--name <project-name>] [--force]
 
 ## Behavior
 
-- Writes `docs/.helpers/config.toml` with a minimal `[code_index]` skeleton (see `docs/architecture/config.md`).
+- Writes `docs/.helpers/config.toml` with a minimal `[code_index]` skeleton (see `../../../docs/architecture/config.md`).
 - Writes `docs/.helpers/.gitignore` containing `index.sqlite*` so the index file is not committed.
 - Refuses without `--force` when `config.toml` already exists; refuses no-op when nothing would be written.
 - `force_used` distinguishes "actually overwrote a prior file" from "fresh init" or "no-op `--force`".
