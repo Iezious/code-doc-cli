@@ -14,7 +14,7 @@ For large polyglot codebases, asking Claude agents to read raw source for every 
 
 ## Status
 
-Design phase. Implementation begins in a separate session. See `docs/architecture/` for the decisions, `docs/plans/` for the work plans, and `docs/CLAUDE.md` for the documentation layout.
+MVP shipped. Current version: `0.2.0` (adds `code_index usage` subcommand + ships agent docs inside the wheel). `v0.1.0` is tagged on the MVP-complete commit; the `v0.2.0` tag will follow shortly. See `docs/architecture/` for design decisions, `docs/plans/` for delivered features, and `docs/CLAUDE.md` for the documentation layout.
 
 ## Install
 
@@ -35,18 +35,10 @@ Pulls the latest from the same source URL used at install.
 ### Pinning to a tag
 
 ```bash
-uv tool install git+https://github.com/Iezious/code_index.git@v0.1.0
+uv tool install git+https://github.com/Iezious/code_index.git@v0.2.0
 ```
 
 Optional, for users who want a stable version rather than tracking `HEAD`.
-
-### Voyage backend (optional)
-
-```bash
-uv tool install "git+https://github.com/Iezious/code_index.git[voyage]"
-```
-
-Requires `VOYAGE_API_KEY` in the environment.
 
 ### For engine development
 
@@ -54,17 +46,35 @@ Requires `VOYAGE_API_KEY` in the environment.
 uv tool install --editable .
 ```
 
-If you're hacking on `code_index` itself, clone the repo and use the editable install.
+If you're hacking on `code_index` itself, clone the repo and use the editable install. Build/test/typecheck commands live in `CLAUDE.md`.
 
-## CLI surface (planned)
+## Quick start
 
+```bash
+cd <your-project>
+code_index init                          # scaffold docs/.helpers/{config.toml,.gitignore}
+code_index index build                   # walk, chunk, embed, store
+code_index search "where do we handle dropped sessions" --format json
+code_index symbols defs FastembedBackend --exact
+code_index graph callers IEnumerable --lang csharp
 ```
-code_index init
-code_index index build
-code_index index sync
-code_index search "..." --lang lsl --k 10
-code_index symbols defs Foo
-code_index graph callers Bar
+
+After source edits, run `code_index index sync` to update incrementally. After changing `embed_model` in config, run `code_index index rebuild --yes`.
+
+## Documentation
+
+Agent-facing docs ship inside the wheel and are discoverable at runtime:
+
+```bash
+code_index usage                         # index page listing all 9 topics
+code_index usage search                  # detail page for a subcommand
+code_index --format json usage init      # machine-readable
 ```
 
-See `docs/architecture/cli.md` for the full command surface.
+The same docs live in-tree under [`src/code_index/usage/`](src/code_index/usage/). Design rationale lives under `docs/architecture/`.
+
+## CLI surface
+
+`init` · `index build|sync|rebuild` · `search` · `symbols defs|refs` · `graph callers|deps` · `config show` · `usage`
+
+See [`docs/architecture/cli.md`](docs/architecture/cli.md) for the full contract or run `code_index usage` for the agent reference.
