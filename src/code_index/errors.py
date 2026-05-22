@@ -53,8 +53,10 @@ EXIT_UNKNOWN: int = 99
 class Kinds:
     """Registry of stable ``kind`` strings in the error envelope."""
 
-    # CLI (code 1)
+    # CLI / usage (code 1)
     CLI_NOT_IMPLEMENTED: str = "cli.not_implemented"
+    USAGE_CONFIRMATION_REQUIRED: str = "usage.confirmation_required"
+    CLI_BAD_ENUM: str = "cli.bad_enum"
 
     # Config (code 2)
     CONFIG_PARSE_ERROR: str = "config.parse_error"

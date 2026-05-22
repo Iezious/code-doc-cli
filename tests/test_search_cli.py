@@ -615,23 +615,41 @@ def test_bm25_k_zero_rejected_at_parse_time(
 
 
 # ---------------------------------------------------------------------------
-# Bad --mode value: Typer's enum validator rejects with exit code 2.
+# Bad --mode value: explicit pre-check raises cli.bad_enum (Phase 7 step 004).
 # ---------------------------------------------------------------------------
 
 
 def test_bad_mode_rejected_with_usage_error(
     chdir_polyglot: Path,
     use_cached_backend: None,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
+    """``--mode <bad>`` -> exit 1, ``kind == "cli.bad_enum"``.
+
+    Phase 7 step 004 replaced Typer's enum-driven exit-2 rejection with an
+    explicit pre-check in ``cli_search`` that maps to
+    :attr:`Kinds.CLI_BAD_ENUM` (code 1) so the envelope round-trips under
+    ``--format json``. Routed through :func:`_invoke` because
+    :class:`CliRunner` bypasses the boundary handler that emits the JSON
+    envelope.
+    """
     del use_cached_backend
     del chdir_polyglot
 
-    runner: CliRunner = CliRunner()
-    result = runner.invoke(
-        app, ["search", "search_me", "--mode", "telepathic"]
+    exit_code, stdout, _stderr = _run_via_boundary(
+        ["--format", "json", "search", "search_me", "--mode", "telepathic"],
+        capsys,
     )
-    # Typer's enum validator (via _SearchMode) rejects with exit code 2.
-    assert result.exit_code == 2
+    assert exit_code == 1
+    envelope: dict[str, Any] = json.loads(stdout)
+    error: dict[str, Any] = envelope["error"]
+    assert error["code"] == 1
+    assert error["kind"] == "cli.bad_enum"
+    assert "telepathic" in error["message"]
+    detail: dict[str, Any] = error["detail"]
+    assert detail["flag"] == "--mode"
+    assert detail["value"] == "telepathic"
+    assert "hybrid" in detail["expected"]
 
 
 # ---------------------------------------------------------------------------

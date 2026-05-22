@@ -99,13 +99,20 @@ def test_config_show_valid_text(capsys: pytest.CaptureFixture[str]) -> None:
         capsys,
     )
     assert code == 0
-    assert "embed_backend = fastembed" in out
-    assert "embed_model = jinaai/jina-embeddings-v2-base-code" in out
-    # Keys are sorted alphabetically.
-    out_keys = [
-        line.split(" = ", 1)[0] for line in out.strip().splitlines() if " = " in line
+    # Phase 7 (feature 007 step 001) replaced the Phase 1 ``key = value``
+    # text format with two ``key: value`` stanzas under ``config:`` and
+    # ``index:`` headers. With no index built against the fixture, the
+    # ``index`` block reads ``not built``.
+    assert "embed_backend: fastembed" in out
+    assert "embed_model: jinaai/jina-embeddings-v2-base-code" in out
+    assert "index: not built" in out
+    # Keys inside the ``config`` block are sorted alphabetically.
+    config_keys: list[str] = [
+        line.strip().split(":", 1)[0]
+        for line in out.splitlines()
+        if line.startswith("  ") and ":" in line
     ]
-    assert out_keys == sorted(out_keys)
+    assert config_keys == sorted(config_keys)
     # Valid fixture, no unknown keys -> stderr is empty.
     assert err == ""
 

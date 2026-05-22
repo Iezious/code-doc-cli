@@ -16,7 +16,7 @@ Voyage backend; the kind reuse is documented in this feature's ``outcome.md``.
 from __future__ import annotations
 
 from code_index.config import CodeIndexConfig
-from code_index.errors import EXIT_USAGE, CodeIndexError, Kinds
+from code_index.errors import EXIT_BACKEND, EXIT_USAGE, CodeIndexError, Kinds
 
 from .fastembed import FastembedBackend
 from .protocol import EmbeddingBackend
@@ -39,10 +39,27 @@ def from_config(config: CodeIndexConfig) -> EmbeddingBackend:
     """
     backend = config.embed_backend
     if backend == "fastembed":
-        return FastembedBackend(
-            model=config.embed_model,
-            batch_size=config.embed_batch_size,
-        )
+        try:
+            return FastembedBackend(
+                model=config.embed_model,
+                batch_size=config.embed_batch_size,
+            )
+        except CodeIndexError:
+            raise
+        except Exception as exc:
+            raise CodeIndexError(
+                code=EXIT_BACKEND,
+                kind=Kinds.BACKEND_MODEL_DOWNLOAD_FAILED,
+                message=(
+                    f"fastembed model {config.embed_model!r} failed to load: "
+                    f"{exc}"
+                ),
+                detail={
+                    "model": config.embed_model,
+                    "cause": str(exc),
+                    "type": type(exc).__name__,
+                },
+            ) from exc
     # `embed_backend` is `Literal["fastembed", "voyage"]`, so the only remaining
     # value is "voyage". Phase 7 replaces this raise with the real Voyage
     # backend.

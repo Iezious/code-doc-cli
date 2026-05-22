@@ -21,7 +21,7 @@ in :mod:`code_index.errors``.
 
 from __future__ import annotations
 
-import enum
+import json
 import sqlite3
 import sys
 from pathlib import Path
@@ -40,6 +40,7 @@ from code_index.errors import (
     EXIT_CONFIG,
     EXIT_INDEX_MISSING,
     EXIT_INDEX_MODEL,
+    EXIT_INDEX_SCHEMA,
     EXIT_UNKNOWN,
     EXIT_USAGE,
     CodeIndexError,
@@ -161,6 +162,7 @@ def main(
 
 @app.command("init")
 def cli_init(
+    ctx: typer.Context,
     name: Annotated[str | None, typer.Option("--name", help="Project name.")] = None,
     force: Annotated[
         bool, typer.Option("--force", help="Overwrite existing config.")
@@ -175,12 +177,44 @@ def cli_init(
     the closest existing fit per ``002.context.md``). The ``.gitignore``
     write is idempotent: identical contents skip the write so mtime stays
     stable.
+
+    Under ``--format json`` the success summary is a single JSON document
+    with the four fields ``config_path``, ``gitignore_path``, ``project``,
+    ``force_used`` (Phase 7 step 002 — see
+    ``docs/plans/007.config-show-json-polish/002.init-json.md``).
+    ``force_used`` is ``true`` iff ``--force`` was passed **and** an
+    existing ``config.toml`` was overwritten; otherwise ``false`` (fresh
+    init, or ``--force`` against an empty dir).
     """
+    ctx_obj: dict[str, Any] = ctx.obj or {}
+    format_value: str = ctx_obj.get("format", "text")
+
     project_root: Path = Path.cwd()
-    config_path, _gitignore_path, _gitignore_written = write_skeleton(
+    helpers_dir: Path = project_root / "docs" / ".helpers"
+    config_path: Path = helpers_dir / "config.toml"
+    gitignore_path: Path = helpers_dir / ".gitignore"
+    # Capture pre-existence before `write_skeleton` mutates the tree so
+    # ``force_used`` can distinguish "overwrote prior config" from
+    # "fresh init or no-op --force".
+    config_pre_exists: bool = config_path.exists()
+
+    config_path, gitignore_path, _gitignore_written = write_skeleton(
         project_root, project_name=name, force=force
     )
-    # Single-line stdout summary; the JSON shape will be tightened in Phase 7.
+    project_name: str = name if name else project_root.resolve().name
+    force_used: bool = force and config_pre_exists
+
+    if format_value == "json":
+        payload: dict[str, Any] = {
+            "config_path": config_path.resolve().as_posix(),
+            "gitignore_path": gitignore_path.resolve().as_posix(),
+            "project": project_name,
+            "force_used": force_used,
+        }
+        write_result_stdout(json.dumps(payload, indent=2))
+        return
+
+    # Text mode (Phase 4) — single-line stdout summary, unchanged.
     write_result_stdout(f"wrote {config_path.relative_to(project_root).as_posix()}")
 
 
@@ -312,10 +346,11 @@ def cli_index_rebuild(
     :func:`code_index.indexer.build` will overwrite the persisted meta
     keys anyway.
 
-    Without ``--yes`` the command raises :class:`CodeIndexError` with the
-    local-string kind ``"usage.confirmation_required"`` (see
-    ``002.context.md`` — kept as a raise-site literal rather than promoted
-    to :class:`Kinds` pending an architect's decision) and exit code 1.
+    Without ``--yes`` the command raises :class:`CodeIndexError` with
+    :attr:`Kinds.USAGE_CONFIRMATION_REQUIRED` and exit code 1. The envelope
+    ``kind`` string ``"usage.confirmation_required"`` is unchanged from
+    Phase 6; Phase 7 step 004 promoted the literal to a registry constant
+    so the dotted string has a single source of truth.
 
     Stdout summary matches ``index build``'s shape: ``--format text``
     writes ``indexed <N> files, <M> chunks``; ``--format json`` writes the
@@ -328,7 +363,7 @@ def cli_index_rebuild(
     if not yes:
         raise CodeIndexError(
             code=EXIT_USAGE,
-            kind="usage.confirmation_required",
+            kind=Kinds.USAGE_CONFIRMATION_REQUIRED,
             message=(
                 "`index rebuild` is destructive; re-run with `--yes` to "
                 "confirm dropping and rebuilding the index"
@@ -361,21 +396,14 @@ def cli_index_rebuild(
     )
 
 
-class _SearchMode(enum.StrEnum):
-    """``--mode`` enum.
-
-    :class:`enum.StrEnum` (Python 3.11+) gives the members native ``str``
-    behavior so Typer renders the values as bare strings on ``--help`` and
-    accepts the literal ``"bm25"`` / ``"dense"`` / ``"hybrid"`` on the
-    command line. Unknown values surface as Typer's native usage error
-    (exit code 2). Per ``002.context.md`` this is the recommended path
-    over a hand-rolled :data:`Kinds.CONFIG_BAD_ENUM` raise — the
-    Typer-level rejection already satisfies the contract.
-    """
-
-    bm25 = "bm25"
-    dense = "dense"
-    hybrid = "hybrid"
+#: Allowed values for ``code_index search --mode``. Kept as a plain tuple of
+#: strings (not a :class:`enum.Enum` / :class:`enum.StrEnum`) so Typer treats
+#: the flag as ``str`` and does NOT pre-empt our validation with its own
+#: exit-code-2 usage error. Phase 7 step 004 moved validation into
+#: :func:`cli_search`'s body so unknown values surface as
+#: :attr:`Kinds.CLI_BAD_ENUM` (code 1) under ``--format json`` via the
+#: standard error envelope.
+_SEARCH_MODES: tuple[str, ...] = ("bm25", "dense", "hybrid")
 
 
 @app.command("search")
@@ -408,9 +436,9 @@ def cli_search(
         typer.Option("--path", help="GLOB pattern applied to chunks.path."),
     ] = None,
     mode: Annotated[
-        _SearchMode,
-        typer.Option("--mode", help="bm25|dense|hybrid", case_sensitive=False),
-    ] = _SearchMode.hybrid,
+        str,
+        typer.Option("--mode", help="bm25|dense|hybrid"),
+    ] = "hybrid",
 ) -> None:
     """Hybrid BM25 + dense retrieval over the per-project index.
 
@@ -448,6 +476,27 @@ def cli_search(
     format_value: str = ctx_obj.get("format", "text")
     verbose_flag: bool = bool(ctx_obj.get("verbose", False))
 
+    # ``--mode`` enum validation (Phase 7 step 004). Kept as an explicit
+    # pre-check rather than Typer's enum machinery so unknown values map to
+    # ``Kinds.CLI_BAD_ENUM`` (code 1) and surface through the JSON envelope;
+    # Typer's built-in enum rejection would emit its own text usage error
+    # at exit code 2 regardless of ``--format``.
+    mode_normalized: str = mode.lower()
+    if mode_normalized not in _SEARCH_MODES:
+        raise CodeIndexError(
+            code=EXIT_USAGE,
+            kind=Kinds.CLI_BAD_ENUM,
+            message=(
+                f"invalid --mode value: {mode!r}; expected one of "
+                f"{', '.join(_SEARCH_MODES)}"
+            ),
+            detail={
+                "flag": "--mode",
+                "value": mode,
+                "expected": list(_SEARCH_MODES),
+            },
+        )
+
     config_path: Path = _resolve_config_path(ctx)
     cfg: CodeIndexConfig = load_config(config_path)
 
@@ -483,18 +532,19 @@ def cli_search(
     )
     try:
         backend: embeddings.EmbeddingBackend | None = None
-        if mode is not _SearchMode.bm25:
+        if mode_normalized != "bm25":
             backend = embeddings.from_config(cfg)
             storage.verify_index_compat(conn, backend)
 
-        # ``_SearchMode`` is a :class:`enum.StrEnum`; ``.value`` typechecks
-        # as the ``Mode`` literal (the enum's members exactly cover its
-        # three values), so no cast is needed.
+        # ``mode_normalized`` is one of the three :data:`_SEARCH_MODES`
+        # strings (guarded by the explicit pre-check above); the
+        # :func:`search_module.search` ``mode`` parameter is typed as the
+        # corresponding ``Literal``, so cast via the local string.
         results: list[SearchResult] = search_module.search(
             conn,
             query,
             backend=backend,
-            mode=mode.value,
+            mode=mode_normalized,  # type: ignore[arg-type]
             k=k,
             bm25_k=bm25_k,
             dense_k=dense_k,
@@ -955,10 +1005,11 @@ def _resolve_config_path(ctx: typer.Context) -> Path:
 
 
 def _config_show_payload(cfg: CodeIndexConfig, config_path: Path) -> dict[str, Any]:
-    """Build the Phase 1 JSON shape for ``config show`` (see ``005.context.md``).
+    """Build the Phase 1 ``config`` block for ``config show`` (see ``005.context.md``).
 
-    Phase 7 will add an ``index`` sibling alongside ``config``; the field set
-    here is the stable Phase 1 contract.
+    Phase 7 (step 001) adds an ``index`` sibling alongside this block in
+    :func:`cli_config_show`; the field set here is the stable Phase 1
+    contract.
     """
     project_root: Path = config_path.parent.parent.parent.resolve()
     resolved_roots: list[str] = [
@@ -981,31 +1032,179 @@ def _config_show_payload(cfg: CodeIndexConfig, config_path: Path) -> dict[str, A
     }
 
 
+#: Order in which ``meta`` keys are emitted in the ``index`` block of
+#: ``config show``'s JSON output (per ``007.config-show-json-polish/
+#: context.md`` decision 4 and ``001.context.md`` "JSON key ordering").
+_INDEX_META_KEYS: tuple[str, ...] = (
+    "schema_version",
+    "code_index_version",
+    "embed_model",
+    "embed_dim",
+)
+
+
+def _read_index_meta(db_path: Path) -> dict[str, str] | None:
+    """Return the four diagnostic ``meta`` values from ``db_path`` or ``None``.
+
+    Opens the index in diagnostic mode (``check_version=False,
+    create_if_missing=False``) so a schema-mismatched ``meta.schema_version``
+    does not raise — ``config show`` is the carve-out that must report drift
+    rather than refuse to read it (see ``001.context.md`` "Why no schema
+    gating").
+
+    Returns ``None`` when ``db_path`` does not exist. When the file is
+    present but cannot be opened as a SQLite database, raises
+    :class:`CodeIndexError` with :attr:`Kinds.INDEX_UNREADABLE` (code 10);
+    this is the only failure path the helper raises on.
+
+    Missing ``meta`` rows are reported as the empty string (matching how
+    every other consumer of :func:`storage.get_meta` would render a
+    ``None`` row when serialized to JSON; values inside ``index`` are
+    documented as strings per ``context.md`` decision 4).
+    """
+    if not db_path.exists():
+        return None
+
+    try:
+        conn = open_index(
+            db_path, create_if_missing=False, check_version=False
+        )
+    except CodeIndexError:
+        # ``open_index`` already wraps storage failures (vec extension,
+        # FTS5, schema mismatch) in CodeIndexError. With
+        # ``check_version=False`` schema mismatch never raises; the only
+        # CodeIndexError paths left translate to "the file is present but
+        # is not a usable SQLite index". Re-raise as the documented
+        # diagnostic-read failure surface.
+        raise
+    except sqlite3.DatabaseError as exc:
+        raise CodeIndexError(
+            code=EXIT_INDEX_SCHEMA,
+            kind=Kinds.INDEX_UNREADABLE,
+            message=(
+                f"index file at {db_path.as_posix()} is not a readable "
+                f"SQLite database: {exc}"
+            ),
+            detail={"path": db_path.as_posix(), "cause": str(exc)},
+        ) from exc
+
+    try:
+        try:
+            values: dict[str, str] = {
+                key: (get_meta(conn, key) or "") for key in _INDEX_META_KEYS
+            }
+        except sqlite3.DatabaseError as exc:
+            raise CodeIndexError(
+                code=EXIT_INDEX_SCHEMA,
+                kind=Kinds.INDEX_UNREADABLE,
+                message=(
+                    f"index file at {db_path.as_posix()} is not a readable "
+                    f"SQLite database: {exc}"
+                ),
+                detail={"path": db_path.as_posix(), "cause": str(exc)},
+            ) from exc
+    finally:
+        conn.close()
+
+    return values
+
+
+def _config_show_text(
+    config_block: dict[str, Any], index_block: dict[str, str] | None
+) -> str:
+    """Render the text-mode body for ``config show``.
+
+    Two stanzas separated by a blank line:
+
+    - ``config:`` header followed by two-space-indented ``key: value`` lines
+      sorted by key.
+    - ``index:`` header followed by two-space-indented ``key: value`` lines
+      (still sorted within the block) when the index is built, or
+      ``index: not built`` when ``index_block`` is ``None``.
+
+    When ``config_block["embed_model"]`` and ``index_block["embed_model"]``
+    disagree, the ``index`` block's ``embed_model`` line gets a trailing
+    `` [mismatch]`` marker. The marker is text-mode-only — JSON consumers
+    compare the two strings themselves (see ``001.context.md``
+    "Text-mode formatting").
+    """
+    config_lines: list[str] = ["config:"]
+    for key in sorted(config_block.keys()):
+        value: Any = config_block[key]
+        if isinstance(value, list):
+            items: list[Any] = value  # type: ignore[reportUnknownVariableType]
+            rendered: str = "[" + ", ".join(repr(v) for v in items) + "]"
+        else:
+            rendered = str(value)
+        config_lines.append(f"  {key}: {rendered}")
+
+    if index_block is None:
+        return "\n".join(config_lines) + "\n\nindex: not built"
+
+    configured_model: Any = config_block.get("embed_model")
+    indexed_model: str = index_block.get("embed_model", "")
+    mismatch: bool = (
+        isinstance(configured_model, str)
+        and indexed_model != ""
+        and configured_model != indexed_model
+    )
+
+    index_lines: list[str] = ["index:"]
+    for key in sorted(index_block.keys()):
+        value_str: str = index_block[key]
+        suffix: str = (
+            " [mismatch]" if mismatch and key == "embed_model" else ""
+        )
+        index_lines.append(f"  {key}: {value_str}{suffix}")
+
+    return "\n".join(config_lines) + "\n\n" + "\n".join(index_lines)
+
+
 @config_app.command("show")
 def cli_config_show(ctx: typer.Context) -> None:
-    """Print the resolved configuration to stdout."""
+    """Print the resolved configuration plus the index's diagnostic meta.
+
+    The Phase 7 body extends the Phase 1 ``{"config": {...}}`` shape to a
+    sibling ``"index"`` block carrying ``meta.schema_version``,
+    ``meta.code_index_version``, ``meta.embed_model``, and ``meta.embed_dim``
+    (decision 4 in ``docs/plans/007.config-show-json-polish/context.md``).
+
+    ``config show`` is the only subcommand that does not gate on schema,
+    model, or dim mismatch — it reports the drift instead. The only
+    failures it raises are:
+
+    - No ``docs/.helpers/config.toml`` discovered (re-uses
+      :attr:`Kinds.INDEX_MISSING`, code 12, via :func:`_resolve_config_path`).
+    - :func:`load_config` raises (propagates to the boundary handler).
+    - The index file is present but unparseable as SQLite (raised by
+      :func:`_read_index_meta` as :attr:`Kinds.INDEX_UNREADABLE`, code 10).
+    """
     ctx_obj: dict[str, Any] = ctx.obj or {}
     format_value: str = ctx_obj.get("format", "text")
 
     config_path: Path = _resolve_config_path(ctx)
     cfg: CodeIndexConfig = load_config(config_path)
     payload: dict[str, Any] = _config_show_payload(cfg, config_path)
+    config_block: dict[str, Any] = payload["config"]
+
+    project_root: Path = config_path.parent.parent.parent.resolve()
+    db_path: Path = project_root / "docs" / ".helpers" / "index.sqlite"
+    index_block: dict[str, str] | None = _read_index_meta(db_path)
 
     if format_value == "json":
-        write_json_stdout(payload)
+        ordered_index: dict[str, str] | None
+        if index_block is None:
+            ordered_index = None
+        else:
+            ordered_index = {key: index_block[key] for key in _INDEX_META_KEYS}
+        document: dict[str, Any] = {
+            "config": config_block,
+            "index": ordered_index,
+        }
+        write_json_stdout(document)
         return
 
-    inner: dict[str, Any] = payload["config"]
-    lines: list[str] = []
-    for key in sorted(inner.keys()):
-        value: Any = inner[key]
-        if isinstance(value, list):
-            items: list[Any] = value  # type: ignore[reportUnknownVariableType]
-            rendered: str = "[" + ", ".join(repr(v) for v in items) + "]"
-        else:
-            rendered = str(value)
-        lines.append(f"{key} = {rendered}")
-    write_result_stdout("\n".join(lines))
+    write_result_stdout(_config_show_text(config_block, index_block))
 
 
 # ---------------------------------------------------------------------------
