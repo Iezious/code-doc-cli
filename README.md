@@ -14,7 +14,7 @@ For large polyglot codebases, asking Claude agents to read raw source for every 
 
 ## Status
 
-MVP shipped. Current version: `0.2.0` (adds `code_index usage` subcommand + ships agent docs inside the wheel). `v0.1.0` is tagged on the MVP-complete commit; the `v0.2.0` tag will follow shortly. See `docs/architecture/` for design decisions, `docs/plans/` for delivered features, and `docs/CLAUDE.md` for the documentation layout.
+MVP shipped. Current version: `0.2.1` (patch: fixes fastembed ONNX OOM on long chunks by capping per-text tokens at 1024 and lowering default `embed_batch_size` from 32 to 16; adds `chunks_chunked` to the `index build` / `index rebuild` JSON shape; fixes init JSON refuse-path Windows backslashes). Tags `v0.1.0` and `v0.2.0` are on prior milestones; `v0.2.1` follows this commit. See `docs/architecture/` for design decisions, `docs/plans/` for delivered features, and `docs/CLAUDE.md` for the documentation layout.
 
 ## Install
 
@@ -35,7 +35,7 @@ Pulls the latest from the same source URL used at install.
 ### Pinning to a tag
 
 ```bash
-uv tool install git+https://github.com/Iezious/code_index.git@v0.2.0
+uv tool install git+https://github.com/Iezious/code_index.git@v0.2.1
 ```
 
 Optional, for users who want a stable version rather than tracking `HEAD`.
