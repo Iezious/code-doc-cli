@@ -48,11 +48,17 @@ class IndexerResult:
     ``files_walked`` counts every :class:`WalkedFile` the walker yielded,
     including files whose plugin raised or whose IO failed. ``files_chunked``
     counts only files that were successfully processed end-to-end (and
-    therefore got a ``files`` row in non-dry-run mode).
+    therefore got a ``files`` row in non-dry-run mode). ``chunks_chunked``
+    counts every chunk the language plugins produced; ``chunks_inserted``
+    is the subset actually written to the ``chunks`` table. Under
+    ``dry_run=True`` the two diverge: ``chunks_chunked`` reflects the real
+    chunker output while ``chunks_inserted`` stays zero because no rows are
+    written.
     """
 
     files_walked: int
     files_chunked: int
+    chunks_chunked: int
     chunks_inserted: int
     symbols_inserted: int
     edges_inserted: int
@@ -173,7 +179,7 @@ def build(
 
     write_log_stderr(
         f"indexed {result.files_chunked} files, "
-        f"{result.chunks_inserted} chunks in {elapsed:.1f}s"
+        f"{result.chunks_chunked} chunks in {elapsed:.1f}s"
     )
     return result
 
@@ -302,6 +308,10 @@ def _run_pipeline(
             plugin_name=plugin.name,
         )
         counts.files_chunked += 1
+        # ``chunks_chunked`` tracks chunker output regardless of dry-run,
+        # giving the dry-run summary an observability signal beyond the
+        # always-zero ``chunks_inserted``.
+        counts.chunks_chunked += len(chunks)
 
         for chunk in chunks:
             buffer.append(
@@ -352,6 +362,7 @@ def _run_pipeline(
     return IndexerResult(
         files_walked=counts.files_walked,
         files_chunked=counts.files_chunked,
+        chunks_chunked=counts.chunks_chunked,
         chunks_inserted=counts.chunks_inserted,
         symbols_inserted=counts.symbols_inserted,
         edges_inserted=counts.edges_inserted,
@@ -365,6 +376,7 @@ class _Counters:
 
     files_walked: int = 0
     files_chunked: int = 0
+    chunks_chunked: int = 0
     chunks_inserted: int = 0
     symbols_inserted: int = 0
     edges_inserted: int = 0

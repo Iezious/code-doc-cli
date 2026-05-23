@@ -50,3 +50,14 @@ Fix: bound per-text token length to a much smaller value at the tokenizer level 
 - `src/code_index/usage/index-build.md`, `src/code_index/usage/config-show.md` — mirror the new default (16) in the two places that quoted `32`.
 - `tests/test_config.py` — `test_defaults_applied` asserts `embed_batch_size == 16` (the assertion pinned the old default; we are intentionally changing it).
 Verification: `uv run pytest tests/test_indexer_pipeline.py tests/test_index_build_cli.py tests/test_search_pipeline.py tests/test_phase6_dod.py tests/test_config.py -x` — 43 passed. `uv run ruff check src/code_index/embeddings/fastembed.py src/code_index/config.py` — clean. `uv run pyright src/code_index/embeddings/fastembed.py src/code_index/config.py` — 0 errors / 0 warnings. Real-project sanity: `code_index index build --verbose` in `D:/GitRoot/_SIN` runs stable at ~3.4 GB RSS without the BFCArena allocation error (tail captured in `## Notes & Issues` once the run completes).
+
+### Step 003 — dry-run summary reports zero chunks (2026-05-23)
+Scope-stretch: user-confirmed extension of the JSON contract Phase 7 pinned for `index build` / `index rebuild`. Adds a new `chunks_chunked` field to `IndexerResult` and exposes it in the JSON shape; text-mode summary line switches from `chunks_inserted` to `chunks_chunked` so dry-run reports the chunker's actual output. `chunks_inserted == 0` under `--dry-run` remains; for a real build the two values are equal. Downstream consequence: the Fast 001 usage docs for `index build` / `index rebuild` were updated to document the new field.
+- `src/code_index/indexer.py` — add `chunks_chunked` to `IndexerResult` and `_Counters`; accumulate at `_PendingFile` registration so dry-run participates; threaded through `IndexerResult` construction; final stderr summary line reads `chunks_chunked`.
+- `src/code_index/cli.py` — `cli_index_build` and `cli_index_rebuild` JSON payloads include `chunks_chunked` (after `files_chunked`, before `chunks_inserted`); text summaries switch to `chunks_chunked`.
+- `src/code_index/usage/index-build.md`, `src/code_index/usage/index-rebuild.md` — JSON shape blocks include `chunks_chunked`; one-sentence gloss explains the relationship to `chunks_inserted`.
+- `tests/test_indexer_pipeline.py` — dry-run case gains `assert result.chunks_chunked > 0` (existing `chunks_inserted == 0` assertion preserved).
+- `tests/test_index_build_cli.py` — new `test_json_includes_chunks_chunked_under_dry_run` (dry-run JSON has `chunks_chunked > 0` and `chunks_inserted == 0`); new `test_json_chunks_chunked_equals_inserted_in_real_build` pins the equality contract for non-dry-run.
+- `tests/test_json_roundtrip_dod.py` — Phase 7 build / rebuild shape assertions extended to seven keys (`chunks_chunked` added).
+- `tests/test_phase6_dod.py` — Phase 6 rebuild shape assertion extended likewise.
+- `tests/test_rebuild_cli.py` — JSON shape and per-fixture row-count assertions extended to include `chunks_chunked`.

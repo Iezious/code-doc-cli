@@ -334,6 +334,83 @@ def test_dry_run_writes_no_rows(
 
 
 # ---------------------------------------------------------------------------
+# Bug-fix regression — `chunks_chunked` JSON shape under build / dry-run.
+# ---------------------------------------------------------------------------
+
+
+def test_json_includes_chunks_chunked_under_dry_run(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    warm_fastembed: None,
+) -> None:
+    """``--dry-run`` JSON reports ``chunks_chunked > 0`` with ``chunks_inserted == 0``.
+
+    Regression for the bug where dry-run's per-file verbose lines showed
+    positive chunk counts but the aggregate JSON / text summary printed
+    zero chunks (because only ``chunks_inserted`` was exposed). The fix
+    adds ``chunks_chunked`` to :class:`IndexerResult` and to the CLI's
+    JSON payload.
+    """
+    del warm_fastembed
+    _copy_fixture(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    runner: CliRunner = CliRunner()
+    init_result = runner.invoke(app, ["init"])
+    assert init_result.exit_code == 0, init_result.stderr
+
+    result = runner.invoke(
+        app,
+        [
+            "--format",
+            "json",
+            "index",
+            "build",
+            "--root",
+            str(tmp_path),
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0, result.stderr
+
+    payload: dict[str, Any] = json.loads(result.stdout)
+    assert "chunks_chunked" in payload, payload
+    assert "chunks_inserted" in payload, payload
+    assert payload["chunks_chunked"] > 0, payload
+    assert payload["chunks_inserted"] == 0, payload
+
+
+def test_json_chunks_chunked_equals_inserted_in_real_build(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    warm_fastembed: None,
+) -> None:
+    """In a real build ``chunks_chunked == chunks_inserted`` (no dry-run gate).
+
+    Pinning this keeps text-mode output meaningful for both modes: the
+    summary line reads ``chunks_chunked``, which equals what the user
+    would have called "chunks indexed" outside dry-run.
+    """
+    del warm_fastembed
+    _copy_fixture(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    runner: CliRunner = CliRunner()
+    init_result = runner.invoke(app, ["init"])
+    assert init_result.exit_code == 0, init_result.stderr
+
+    result = runner.invoke(
+        app,
+        ["--format", "json", "index", "build", "--root", str(tmp_path)],
+    )
+    assert result.exit_code == 0, result.stderr
+
+    payload: dict[str, Any] = json.loads(result.stdout)
+    assert payload["chunks_chunked"] > 0, payload
+    assert payload["chunks_inserted"] == payload["chunks_chunked"], payload
+
+
+# ---------------------------------------------------------------------------
 # DoD-4 — no config found
 # ---------------------------------------------------------------------------
 

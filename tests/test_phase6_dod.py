@@ -508,6 +508,7 @@ def test_phase6_dod_end_to_end(
     assert set(rebuild_payload.keys()) == {
         "files_walked",
         "files_chunked",
+        "chunks_chunked",
         "chunks_inserted",
         "symbols_inserted",
         "edges_inserted",

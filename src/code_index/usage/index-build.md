@@ -36,6 +36,7 @@ The embedding model is downloaded on first run and cached under the user home di
 {
   "files_walked": 0,
   "files_chunked": 0,
+  "chunks_chunked": 0,
   "chunks_inserted": 0,
   "symbols_inserted": 0,
   "edges_inserted": 0,
@@ -43,7 +44,7 @@ The embedding model is downloaded on first run and cached under the user home di
 }
 ```
 
-`files_walked` includes skipped files (binary, oversize); `files_chunked` is the subset that produced chunks.
+`files_walked` includes skipped files (binary, oversize); `files_chunked` is the subset that produced chunks. `chunks_chunked` is the number of chunks the language plugins produced; `chunks_inserted` is the subset actually written to the index. Under `--dry-run`, `chunks_chunked > 0` and `chunks_inserted == 0`.
 
 ## Failure modes
 

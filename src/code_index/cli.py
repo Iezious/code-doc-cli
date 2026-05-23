@@ -267,6 +267,7 @@ def cli_index_build(
         payload: dict[str, Any] = {
             "files_walked": result.files_walked,
             "files_chunked": result.files_chunked,
+            "chunks_chunked": result.chunks_chunked,
             "chunks_inserted": result.chunks_inserted,
             "symbols_inserted": result.symbols_inserted,
             "edges_inserted": result.edges_inserted,
@@ -276,7 +277,7 @@ def cli_index_build(
         return
 
     write_result_stdout(
-        f"indexed {result.files_chunked} files, {result.chunks_inserted} chunks"
+        f"indexed {result.files_chunked} files, {result.chunks_chunked} chunks"
     )
 
 
@@ -384,6 +385,7 @@ def cli_index_rebuild(
         payload: dict[str, Any] = {
             "files_walked": result.files_walked,
             "files_chunked": result.files_chunked,
+            "chunks_chunked": result.chunks_chunked,
             "chunks_inserted": result.chunks_inserted,
             "symbols_inserted": result.symbols_inserted,
             "edges_inserted": result.edges_inserted,
@@ -393,7 +395,7 @@ def cli_index_rebuild(
         return
 
     write_result_stdout(
-        f"indexed {result.files_chunked} files, {result.chunks_inserted} chunks"
+        f"indexed {result.files_chunked} files, {result.chunks_chunked} chunks"
     )
 
 

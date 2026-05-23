@@ -39,12 +39,15 @@ Same shape as `index build`:
 {
   "files_walked": 0,
   "files_chunked": 0,
+  "chunks_chunked": 0,
   "chunks_inserted": 0,
   "symbols_inserted": 0,
   "edges_inserted": 0,
   "seconds_elapsed": 0.0
 }
 ```
+
+`chunks_chunked` is the number of chunks the language plugins produced; `chunks_inserted` is the subset actually written to the index. `rebuild` does not accept `--dry-run`, so the two values match in practice.
 
 ## Failure modes
 

@@ -287,6 +287,7 @@ def test_index_build_success_json_roundtrips(
     assert set(parsed.keys()) == {
         "files_walked",
         "files_chunked",
+        "chunks_chunked",
         "chunks_inserted",
         "symbols_inserted",
         "edges_inserted",
@@ -363,7 +364,7 @@ def test_index_rebuild_success_json_roundtrips(
     mutable_built: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """``index rebuild --yes`` matches ``index build``'s six-key contract."""
+    """``index rebuild --yes`` matches ``index build``'s seven-key contract."""
     del mutable_built
     exit_code, out, _err = _run(
         ["--format", "json", "index", "rebuild", "--yes"], capsys
@@ -374,6 +375,7 @@ def test_index_rebuild_success_json_roundtrips(
     assert set(parsed.keys()) == {
         "files_walked",
         "files_chunked",
+        "chunks_chunked",
         "chunks_inserted",
         "symbols_inserted",
         "edges_inserted",

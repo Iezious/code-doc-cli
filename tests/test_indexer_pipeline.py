@@ -385,6 +385,11 @@ def test_dry_run_skips_encode_and_inserts(
     assert result.files_walked == 2
     assert result.files_chunked == 2
     assert result.chunks_inserted == 0
+    # ``chunks_chunked`` still reports the chunker's output even under
+    # ``dry_run`` so the dry-run summary has a non-zero signal. The
+    # two-plugin fixture emits two chunks per file.
+    assert result.chunks_chunked > 0
+    assert result.chunks_chunked == 4
     assert backend.calls == []
 
     conn = _db_conn(tmp_path)

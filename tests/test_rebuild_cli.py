@@ -290,6 +290,7 @@ def test_rebuild_json_summary_shape(
     assert set(payload.keys()) == {
         "files_walked",
         "files_chunked",
+        "chunks_chunked",
         "chunks_inserted",
         "symbols_inserted",
         "edges_inserted",
@@ -298,6 +299,7 @@ def test_rebuild_json_summary_shape(
     for key in (
         "files_walked",
         "files_chunked",
+        "chunks_chunked",
         "chunks_inserted",
         "symbols_inserted",
         "edges_inserted",
@@ -308,6 +310,7 @@ def test_rebuild_json_summary_shape(
     # The fixture has two `.py` files, each producing one chunk.
     assert payload["files_walked"] == 2
     assert payload["files_chunked"] == 2
+    assert payload["chunks_chunked"] == 2
     assert payload["chunks_inserted"] == 2
 
 
@@ -393,6 +396,7 @@ def test_rebuild_no_index_yet_degenerates_to_build(
     payload: dict[str, Any] = json.loads(stdout)
     assert payload["files_walked"] == 1
     assert payload["files_chunked"] == 1
+    assert payload["chunks_chunked"] == 1
     assert payload["chunks_inserted"] == 1
 
     # Index file now exists and carries the expected meta.
