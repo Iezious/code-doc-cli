@@ -38,7 +38,7 @@ This doc records *how the MVP gets built*. It introduces no new design decisions
 - **Delivers:**
   - `EmbeddingBackend` protocol per [embeddings](embeddings.md).
   - `fastembed` implementation using Jina v2 base code (768-dim, CPU).
-  - Batching loop honoring `embed_batch_size` from config (default 32).
+  - Batching loop honoring `embed_batch_size` from config (default 16).
   - Backend factory that instantiates from config.
 - **Depends on:** Phase 1.
 - **Exercises:** [embeddings](embeddings.md).

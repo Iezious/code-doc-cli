@@ -57,7 +57,8 @@ embed_model   = "jinaai/jina-embeddings-v2-base-code"
 
 ## Batching and throughput
 
-- Texts are batched (default 32 per `embed_batch_size` in [config](config.md), tunable per project) before each `encode` call.
+- Texts are batched (default 16 per `embed_batch_size` in [config](config.md), tunable per project) before each `encode` call. The default was 32 in earlier versions; lowered to 16 after real-world polyglot codebases triggered an ONNX attention-buffer OOM when a long chunk was batched alongside others (a batch of 32 at the model's 8192-token capacity demands ~100 GB of attention buffer). Batch size combined with the per-text token cap (next bullet) bounds the per-encode memory footprint.
+- **Per-text token cap.** Each text passed to `encode` is truncated to 1024 tokens at the backend's tokenizer (with an 8192-character defense-in-depth cap applied before the tokenizer ever sees the text). Chunks longer than ~1024 tokens are silently truncated by the backend; chunkers should target chunks well under that limit (see [chunking-and-languages](chunking-and-languages.md), "Chunk sizing guidance"). The cap is a backend-level safety net against ONNX padded-attention blowup; it is not exposed as a config knob.
 - The indexer measures and reports chunks/second for visibility.
 - fastembed runs on CPU by default. GPU paths (CUDA, DirectML) are not in scope but not blocked by the interface.
 

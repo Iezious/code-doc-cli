@@ -77,7 +77,7 @@ The walker is the first stage of the indexer pipeline; it decides which files re
 
 ### Ignore sources
 
-- **`.gitignore`** is honored by default when the project root contains a `.git` directory. Honored at every level — root and any nested `.gitignore`. When there is no `.git`, the `.gitignore` mechanism is silently inactive (no warning; many polyglot trees are not git-managed).
+- **`.gitignore`** is honored by default when the project root contains a `.git` directory. Honored at every level — root and any nested `.gitignore`. When there is no `.git`, the `.gitignore` mechanism is silently inactive (no warning; many polyglot trees are not git-managed). The `.gitignore` matcher implementation is unconstrained at the architecture level — `pathspec`'s factory name has changed across major versions (`gitwildmatch` was deprecated in favor of `gitignore` in 1.x), and the walker may use either without architectural impact.
 - **Built-in default excludes**, always applied regardless of `.gitignore`:
   - `.git/`, `.hg/`, `.svn/`
   - `node_modules/`, `bower_components/`

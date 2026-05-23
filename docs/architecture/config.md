@@ -33,7 +33,7 @@ All keys are under `[code_index]`. Types are TOML types; "list of X" means a TOM
 | `extra_languages` | list of relative path strings | no | `[]` | Paths to Python module files providing additional language plugins. Loaded as ordinary Python modules into the plugin registry. |
 | `embed_backend` | enum string: `Literal["fastembed"]` | no | `"fastembed"` | Which embedding backend to use. `Literal` framing is kept for forward extensibility; additional backends are roadmap items (see [embeddings](embeddings.md)). |
 | `embed_model` | string | no | `"jinaai/jina-embeddings-v2-base-code"` when `embed_backend = "fastembed"` | Model identifier. Backend-specific; the loader picks the right default from the active backend. |
-| `embed_batch_size` | int | no | `32` | Batch size passed to the backend's `encode` call. Tunable per project. |
+| `embed_batch_size` | int | no | `16` | Batch size passed to the backend's `encode` call. Tunable per project. |
 
 ### Example
 
@@ -47,7 +47,7 @@ languages        = ["python", "typescript"]
 extra_languages  = ["./.helpers/lang_mydsl.py"]
 embed_backend    = "fastembed"
 embed_model      = "jinaai/jina-embeddings-v2-base-code"
-embed_batch_size = 32
+embed_batch_size = 16
 ```
 
 ## Validation rules

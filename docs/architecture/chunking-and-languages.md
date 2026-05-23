@@ -58,6 +58,7 @@ A plugin returning empty lists is valid (e.g., LSL has no imports in the traditi
 - Chunks include leading docstring/comment lines belonging to the declaration.
 - File-level "prelude" (imports, namespace declarations) is its own chunk of kind `module`.
 - Chunks should not exceed ~200 lines; if a function is genuinely larger, the plugin emits multiple chunks with a continuation marker in `scope`.
+- **Backend safety net.** The embedding backend enforces a hard per-text truncation at 1024 tokens (see [embeddings](embeddings.md), "Batching and throughput"). Chunks that exceed this cap are silently truncated at embed time — symbols, BM25 content, and offsets remain whole, but the dense vector represents only the chunk's prefix. Plugins targeting the ~200-line guidance above stay well clear of this cap; the cap exists to bound padded-attention memory for pathological inputs (e.g. minified single-line files), not as the primary sizing knob.
 
 ## Per-language plugins
 

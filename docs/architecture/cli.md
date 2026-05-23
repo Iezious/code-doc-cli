@@ -43,6 +43,22 @@ code_index index build [--root <path>]   # override config roots
                     [--verbose]
 ```
 
+**JSON shape.** Under `--format json`, `index build` emits one document with the shape:
+
+```json
+{
+  "files_walked": 0,
+  "files_chunked": 0,
+  "chunks_chunked": 0,
+  "chunks_inserted": 0,
+  "symbols_inserted": 0,
+  "edges_inserted": 0,
+  "seconds_elapsed": 0.0
+}
+```
+
+`files_walked` includes files skipped as binary or oversize; `files_chunked` is the subset that produced chunks. `chunks_chunked` is the number of chunks the language plugins produced; `chunks_inserted` is the subset actually written to the index. Under `--dry-run`, `chunks_chunked > 0` and `chunks_inserted == 0`. Failures use the standard error envelope from [errors-and-exit-codes](errors-and-exit-codes.md).
+
 ### `code_index index sync`
 
 Incremental update. For each project file, compares mtime and size against the `files` table (see [storage](storage.md)). Re-chunks and re-embeds files whose mtime or size has changed; inserts new files; deletes rows for files that have vanished from the tree. Does not depend on git.
@@ -75,6 +91,8 @@ code_index index rebuild [--yes]
 ```
 
 `--root` and `--dry-run` are intentionally not supported on `rebuild`; the command is a forced full rebuild against the configured roots. The flag surface is `--yes` plus the cross-cutting `--config`, `--verbose`, `--format`.
+
+**JSON shape.** Same shape as [`code_index index build`](#code_index-index-build) above. Failures use the standard error envelope from [errors-and-exit-codes](errors-and-exit-codes.md).
 
 ### `code_index search`
 
@@ -166,7 +184,7 @@ code_index config show [--format text|json]
     "extra_languages": [],
     "embed_backend": "fastembed",
     "embed_model": "...",
-    "embed_batch_size": 32
+    "embed_batch_size": 16
   },
   "index": {
     "schema_version": "1",
