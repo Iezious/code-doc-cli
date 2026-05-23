@@ -20,7 +20,19 @@ from __future__ import annotations
 import numpy as np
 from fastembed import TextEmbedding
 
-from code_index.errors import EXIT_BACKEND, CodeIndexError, Kinds
+from code_index.errors import EXIT_BACKEND, CodeIndexError, Kinds, write_log_stderr
+
+# Per-chunk token cap for embeddings. Smaller than the model's native 8192
+# to bound padded-attention memory on long chunks (ONNX pads each batch to
+# the longest item, so a single 8192-token chunk can blow up to tens of
+# gigabytes for a BERT-style attention kernel).
+MAX_TOKEN_LENGTH: int = 1024
+
+# Defense-in-depth character cap applied in :meth:`FastembedBackend.encode`
+# before the batching loop. Code averages roughly 3-4 chars per token; 8x
+# is a generous multiplier intended to avoid mangling text that the
+# tokenizer would have truncated correctly anyway.
+MAX_CHARS_PER_TEXT: int = MAX_TOKEN_LENGTH * 8
 
 # Mapping of fastembed model identifiers to stable short names used in
 # `name` ("fastembed:<short-name>"). The architecture doc pins
@@ -55,7 +67,7 @@ class FastembedBackend:
     def __init__(
         self,
         model: str,
-        batch_size: int = 32,
+        batch_size: int = 16,
         cache_dir: str | None = None,
     ) -> None:
         """Instantiate a fastembed text-embedding model.
@@ -91,6 +103,24 @@ class FastembedBackend:
                 },
             ) from exc
 
+        # Override the tokenizer's truncation length so the ONNX attention
+        # kernel never sees more than MAX_TOKEN_LENGTH tokens per text. The
+        # default for `jinaai/jina-embeddings-v2-base-code` is 8192 tokens;
+        # combined with batch padding that triggers tens-of-GB allocations
+        # on long chunks. The attribute path is fastembed-internal — wrap
+        # in a narrow try/except so a future layout change does not break
+        # model loading (the char-level cap in `encode` is the safety net).
+        try:
+            self._model.model.tokenizer.enable_truncation(  # type: ignore[reportUnknownMemberType]
+                max_length=MAX_TOKEN_LENGTH
+            )
+        except AttributeError as exc:
+            write_log_stderr(
+                "warning: could not override fastembed tokenizer truncation "
+                f"(MAX_TOKEN_LENGTH={MAX_TOKEN_LENGTH}); falling back to "
+                f"char-level cap only: {exc}"
+            )
+
     def encode(self, texts: list[str]) -> np.ndarray:
         """Encode ``texts`` in batches of ``self._batch_size``.
 
@@ -100,10 +130,17 @@ class FastembedBackend:
         if not texts:
             return np.empty((0, self.dim), dtype=np.float32)
 
+        # Defense-in-depth: cap each text at MAX_CHARS_PER_TEXT before the
+        # tokenizer ever sees it. The real per-token cap is the tokenizer
+        # truncation override set in __init__; this is the fallback if that
+        # override could not be installed. Build a new list — never mutate
+        # the caller's list.
+        capped: list[str] = [text[:MAX_CHARS_PER_TEXT] for text in texts]
+
         chunks: list[np.ndarray] = []
         bs = self._batch_size
-        for start in range(0, len(texts), bs):
-            batch = texts[start : start + bs]
+        for start in range(0, len(capped), bs):
+            batch = capped[start : start + bs]
             try:
                 vectors = list(self._model.embed(batch))
             except CodeIndexError:

@@ -35,7 +35,7 @@ All other drift conditions (schema mismatch, model mismatch, dim mismatch, missi
     "extra_languages": [],
     "embed_backend": "fastembed",
     "embed_model": "...",
-    "embed_batch_size": 32
+    "embed_batch_size": 16
   },
   "index": {
     "schema_version": "1",

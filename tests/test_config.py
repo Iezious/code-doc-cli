@@ -60,7 +60,7 @@ def test_defaults_applied(tmp_path: Path) -> None:
     assert cfg.languages == list(DEFAULT_LANGUAGES)
     assert cfg.embed_backend == "fastembed"
     assert cfg.embed_model == BACKEND_DEFAULT_MODEL["fastembed"]
-    assert cfg.embed_batch_size == 32
+    assert cfg.embed_batch_size == 16
 
 
 def test_project_default_is_dirname(tmp_path: Path) -> None:

@@ -24,7 +24,7 @@ code_index index build [--root <path>] [--dry-run] [--strict]
 - Dispatches each file to its language plugin; collects `Chunk`, `Symbol`, `Edge` lists.
 - Files above 1 MiB are skipped with a stderr warning by default; `--strict` raises `io.oversize`.
 - Binary files (unknown extension OR first 8 KiB contain a NUL) are skipped silently.
-- Batches chunk text to the embedding backend (`embed_batch_size`, default 32).
+- Batches chunk text to the embedding backend (`embed_batch_size`, default 16).
 - Inserts into `chunks`, `chunks_fts` (BM25), `embeddings` (vec0), `symbols`, `edges`, `files`; writes `meta` (`schema_version`, `code_index_version`, `embed_model`, `embed_dim`).
 - On a populated index: drops existing data and rebuilds (same effect as `index rebuild --yes`).
 

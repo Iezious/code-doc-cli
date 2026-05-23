@@ -268,7 +268,7 @@ def load_config(
         table.get("extra_languages", []), key="extra_languages"
     )
 
-    embed_batch_size_value: Any = table.get("embed_batch_size", 32)
+    embed_batch_size_value: Any = table.get("embed_batch_size", 16)
     if not isinstance(embed_batch_size_value, int) or isinstance(
         embed_batch_size_value, bool
     ) or embed_batch_size_value <= 0:
