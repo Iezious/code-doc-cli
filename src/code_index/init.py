@@ -89,13 +89,14 @@ def write_skeleton(
     gitignore_path: Path = helpers_dir / ".gitignore"
 
     if config_path.exists() and not force:
+        posix_path: str = config_path.as_posix()
         raise CodeIndexError(
             code=EXIT_USAGE,
             kind=Kinds.CLI_NOT_IMPLEMENTED,
             message=(
-                f"refusing to overwrite existing {config_path} without --force"
+                f"refusing to overwrite existing {posix_path} without --force"
             ),
-            detail={"path": str(config_path)},
+            detail={"path": posix_path},
         )
 
     helpers_dir.mkdir(parents=True, exist_ok=True)

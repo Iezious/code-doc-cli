@@ -161,6 +161,37 @@ def test_refuse_without_force_emits_json_envelope(
     assert error["code"] == 1
 
 
+def test_refuse_without_force_path_uses_forward_slashes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Refuse-path envelope must carry forward-slash path strings.
+
+    Regression for the bug where ``write_skeleton``'s ``message`` and
+    ``detail["path"]`` used the platform-native ``str(Path)`` repr, leaking
+    Windows backslashes into JSON output. The project rule (root
+    ``CLAUDE.md`` and the ``test_fresh_init_json_shape`` assertion at line
+    64 of this file) requires forward slashes in any path emitted to JSON
+    or stderr text.
+    """
+    monkeypatch.chdir(tmp_path)
+    runner: CliRunner = CliRunner()
+    first = runner.invoke(app, ["init"])
+    assert first.exit_code == 0, first.stderr
+
+    capsys.readouterr()
+    exit_code: int = _invoke(["--format", "json", "init"])
+    captured = capsys.readouterr()
+
+    assert exit_code != 0
+    envelope: dict[str, Any] = json.loads(captured.out)
+    error: dict[str, Any] = envelope["error"]
+    assert "\\" not in error["detail"]["path"]
+    assert "\\" not in error["message"]
+    assert error["detail"]["path"].endswith("docs/.helpers/config.toml")
+
+
 def test_text_mode_unchanged_under_no_format(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

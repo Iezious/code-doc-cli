@@ -37,4 +37,6 @@ _populated by the coder when worth saying_
 
 ## Bug Fixes
 
-_populated post-completion by `/bug-fixer` if needed_
+### Step 002 — init JSON refuse-path leaks Windows backslashes (2026-05-23)
+- `src/code_index/init.py` — `write_skeleton` refuse-without-force branch now formats `config_path` via `Path.as_posix()` for both `message` and `detail["path"]`, matching the success-path forward-slash contract.
+- `tests/test_init_json.py` — new `test_refuse_without_force_path_uses_forward_slashes` regression test asserting `"\\"` is absent from `error["detail"]["path"]` and `error["message"]`.
