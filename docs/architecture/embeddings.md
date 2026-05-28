@@ -60,7 +60,7 @@ embed_model   = "jinaai/jina-embeddings-v2-base-code"
 - Texts are batched (default 16 per `embed_batch_size` in [config](config.md), tunable per project) before each `encode` call. The default was 32 in earlier versions; lowered to 16 after real-world polyglot codebases triggered an ONNX attention-buffer OOM when a long chunk was batched alongside others (a batch of 32 at the model's 8192-token capacity demands ~100 GB of attention buffer). Batch size combined with the per-text token cap (next bullet) bounds the per-encode memory footprint.
 - **Per-text token cap.** Each text passed to `encode` is truncated to 1024 tokens at the backend's tokenizer (with an 8192-character defense-in-depth cap applied before the tokenizer ever sees the text). Chunks longer than ~1024 tokens are silently truncated by the backend; chunkers should target chunks well under that limit (see [chunking-and-languages](chunking-and-languages.md), "Chunk sizing guidance"). The cap is a backend-level safety net against ONNX padded-attention blowup; it is not exposed as a config knob.
 - The indexer measures and reports chunks/second for visibility.
-- fastembed runs on CPU by default. GPU paths (CUDA, DirectML) are not in scope but not blocked by the interface.
+- fastembed runs on CPU by default. CUDA GPU acceleration is now a supported path, selected by the `CODE_INDEX_DEVICE` env var (see "Update 2026-05-28: GPU acceleration" below). DirectML remains rejected.
 
 ## Caching
 
@@ -75,3 +75,28 @@ An embedding cache keyed by chunk content hash is **planned for v1.1 and not in 
 ## Open questions
 
 None pinned here. A benchmark harness for comparing backends was demoted to [roadmap](roadmap.md); the ensemble option is now recorded under "Rejected alternatives" above.
+
+### Update 2026-05-28: GPU acceleration
+
+GPU acceleration of embedding is promoted from out-of-scope to a supported path, via a local CUDA GPU. Stage one is fastembed + CUDA only.
+
+**Device selection via env var.** A new env var `CODE_INDEX_DEVICE` selects where the model runs. Values and semantics:
+
+- `auto` (default): use CUDA if the ONNX runtime offers `CUDAExecutionProvider`, else CPU. Silent — no warning.
+- `cuda`: explicit request. If the CUDA provider is unavailable at runtime (no GPU/driver, or a CPU-only onnxruntime build is installed), warn on stderr and fall back to CPU.
+- `cpu`: force CPU even on a GPU box.
+
+Device is machine-local and is not a TOML key — see [config](config.md) for the env-var-vs-TOML policy and the reasoning (committed config must stay portable across teammates).
+
+**Device is not index identity.** `backend.name` (e.g. `"fastembed:jina-code-v2"`) carries the model, not the device. fastembed-CPU and fastembed-CUDA produce the same `backend.name`, the same dim, and the same vectors modulo ~4th-decimal float noise. Therefore `verify_index_compat` is unchanged, and a cross-device read (index built on CUDA, queried on CPU, or vice versa) is silently valid by construction — no new warning, no gate. This is deliberately better than warning: it avoids a stderr warning on every cross-device search. The device an index was built on is recorded for display only as `meta.embed_device` (see [storage](storage.md)).
+
+**Packaging: CPU stays default, GPU is a documented manual swap.** `fastembed` (CPU) and `fastembed-gpu` are mutually-exclusive PyPI distributions: they share the same `fastembed` import namespace and pull mutually-exclusive onnxruntime builds (`onnxruntime` CPU vs `onnxruntime-gpu`). You install one or the other, never both. An additive `[gpu]` install extra therefore does not work cleanly. The base install keeps `fastembed` (CPU) as the default hard dependency, preserving the zero-config, offline CPU default. GPU users perform a documented manual swap: `uv pip install fastembed-gpu` (replacing `fastembed`), then set `CODE_INDEX_DEVICE=cuda`. The env var only selects a provider; whether CUDA is actually available depends on which onnxruntime build is installed. These compose: `CODE_INDEX_DEVICE=cuda` on a box with only the base `fastembed` means the CUDA provider is not registered, which is exactly the "requested cuda unavailable → warn + CPU fallback" path.
+
+**Implementation note.** `FastembedBackend` passes `cuda=True` / `providers=[...]` to fastembed's `TextEmbedding` constructor based on the resolved device, and probes `onnxruntime.get_available_providers()` at construction both to implement `auto` and to emit the clean stderr warning when `cuda` was requested but unavailable — instead of relying on ONNX's noisy low-level fallback warning.
+
+**Rejected alternatives.**
+
+- **DirectML.** fastembed does not bless a DirectML build; using it means hand-installing `onnxruntime-directml` (a third mutually-exclusive onnxruntime) and passing `DmlExecutionProvider` against fastembed's own onnxruntime pin — fragile and unsupported. CUDA-only for stage one.
+- **Device as a TOML key.** Committing a per-machine device value breaks portability across teammates; `auto` default plus env override is the portable mechanism.
+
+Forward note: env-selectable *backend* (not device) from a TOML-permitted set is a roadmap item, not stage one — see [roadmap](roadmap.md).

@@ -66,6 +66,13 @@ In-scope MVP items do **not** belong here, even if they were once open questions
 - Why deferred: MVP is single-user, local, CPU-only. Voyage requires an account, an API key, network egress, and per-call billing; nothing in MVP justifies that operational and onboarding friction. The `EmbeddingBackend` Protocol makes Voyage a future-additive change.
 - What unlocks it: a concrete user need for higher-quality / paid embeddings, or a use case where local CPU embeddings are inadequate. When implemented, ships behind a `[voyage]` install extra and is gated by `VOYAGE_API_KEY`; reuses the reserved exit codes `21` (`backend.auth_failed`) and `22` (`backend.rate_limited`).
 
+### Env-selectable backend from a TOML-permitted set
+
+- Source: [embeddings](embeddings.md), [config](config.md).
+- Why deferred: stage one has a single backend (fastembed); the permitted-set plus env-selection machinery is untestable until backend #2 (llamacpp / openai) lands. Note this is about selecting the *backend* (a different vector space), not the *device* — device selection via `CODE_INDEX_DEVICE` ships in stage one (see [embeddings](embeddings.md)).
+- What unlocks it: a second backend. The shape: TOML declares the permitted set, env selects which backend to build with, `meta` stays authoritative for reads, and an incompatible `meta` (a vector space no available backend can produce) fails and prompts rebuild (already code 11). Indices being gitignored, local, disposable build artifacts is what makes this safe.
+- Note: implementing it will revise the current "meta must match config" rule in [config](config.md) (Implications) and [storage](storage.md) ("Embedding storage") into "meta is authoritative for reads; env/config intent gates build/rebuild only." That rule is unchanged for now.
+
 ### Benchmark harness
 
 - Source: [embeddings](embeddings.md).
