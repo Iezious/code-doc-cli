@@ -22,6 +22,7 @@ class _StubBackend:
     def __init__(self, name: str, dim: int) -> None:
         self.name = name
         self.dim = dim
+        self.device = "cpu"
 
     def encode(self, texts: list[str]) -> np.ndarray:  # pragma: no cover - unused
         return np.zeros((len(texts), self.dim), dtype=np.float32)

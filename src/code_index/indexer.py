@@ -135,7 +135,7 @@ def build(
 
     Writes to: ``chunks``, ``chunks_fts``, ``embeddings``, ``symbols``,
     ``edges``, ``files``, and the indexer-owned meta keys
-    (``embed_model``, ``embed_dim``).
+    (``embed_model``, ``embed_dim``, ``embed_device``).
 
     Plugin raises and per-file IO errors: skip + warn on stderr, continue,
     do not raise.
@@ -170,6 +170,7 @@ def build(
         if not dry_run:
             set_meta(conn, "embed_model", backend.name)
             set_meta(conn, "embed_dim", str(backend.dim))
+            set_meta(conn, "embed_device", backend.device)
             conn.commit()
     finally:
         conn.close()
@@ -211,7 +212,8 @@ def _auto_rebuild(conn: sqlite3.Connection) -> None:
     ``003.context.md``: Phase 1's migration creates all six tables together,
     so a non-empty ``chunks`` is sufficient evidence that prior build output
     needs to go. ``meta.schema_version`` and ``meta.code_index_version``
-    are not touched; only the two indexer-owned keys are reset.
+    are not touched; only the three indexer-owned keys
+    (``embed_model``, ``embed_dim``, ``embed_device``) are reset.
     """
     row = conn.execute("SELECT COUNT(*) FROM chunks").fetchone()
     count: int = int(row[0]) if row is not None else 0
@@ -227,7 +229,7 @@ def _auto_rebuild(conn: sqlite3.Connection) -> None:
     conn.execute("DELETE FROM chunks")
     conn.execute("DELETE FROM files")
     conn.execute(
-        "DELETE FROM meta WHERE key IN ('embed_model', 'embed_dim')"
+        "DELETE FROM meta WHERE key IN ('embed_model', 'embed_dim', 'embed_device')"
     )
 
 

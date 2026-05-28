@@ -161,13 +161,20 @@ Graph subcommands accept the same `--lang` filter as `symbols`, and the `<symbol
 
 ### `code_index config show`
 
-Prints the resolved configuration (config file values merged with defaults) and the index metadata (schema version, embed model). Useful for "is my index up to date with my config?" checks.
+Prints the resolved configuration (config file values merged with defaults), the index metadata (schema version, embed model, the device the index was built on), and the effective embedding device for the current run. Useful for "is my index up to date with my config?" checks.
 
 ```
 code_index config show [--format text|json]
 ```
 
 `config show` is the only subcommand that does not refuse on a schema, model, or dim mismatch. Mismatches are reported (both the configured value and the stored `meta` value appear in the output) and the exit code stays 0. Use `config show` to diagnose drift; use `index rebuild` to resolve it.
+
+It is also the no-fail diagnostic surface for device state. The index records the device it was built on in `meta.embed_device` (surfaced as `index.embed_device`; `null` for an index built before this feature). Device state for the current run is reported as two top-level siblings of `config` and `index`, both env-sourced (not config-file-sourced), so both stay out of the `"config"` block (which mirrors TOML keys, and device is not one):
+
+- `requested_device` — the raw `CODE_INDEX_DEVICE` value as set by the user: one of `auto` | `cpu` | `cuda`, defaulting to `auto` when the env var is unset. This is free to report; no probe is needed.
+- `effective_device` — the device this run actually resolved to (`cpu` or `cuda`). When `requested_device` is `auto`, resolving it requires probing `onnxruntime.get_available_providers()`; when `requested_device` is `cpu` or `cuda` the resolution is direct.
+
+Reporting both keeps the cheap raw value always available without forcing the onnxruntime probe, while the resolved value remains for "am I actually on the GPU?" diagnosis. A "built on cpu, running cuda" state is reported, not an error — device is not part of index identity (see [embeddings](embeddings.md)).
 
 **JSON shape.** Under `--format json`, `config show` emits one document with the shape:
 
@@ -190,12 +197,15 @@ code_index config show [--format text|json]
     "schema_version": "1",
     "code_index_version": "...",
     "embed_model": "...",
-    "embed_dim": "768"
-  }
+    "embed_dim": "768",
+    "embed_device": "cuda"
+  },
+  "requested_device": "auto",
+  "effective_device": "cpu"
 }
 ```
 
-`"index"` is `null` when the index file is absent; meta values inside the `"index"` block are strings (matching SQLite TEXT storage).
+`"index"` is `null` when the index file is absent; meta values inside the `"index"` block are strings (matching SQLite TEXT storage). `index.embed_device` is the device the index was built on (read from `meta.embed_device`); it is `null` for an index built before this feature. `requested_device` and `effective_device` are top-level siblings of `config` and `index`, both env-sourced from `CODE_INDEX_DEVICE` rather than config-file values, which is why they live outside the `"config"` block. `requested_device` is the raw env value (`auto` | `cpu` | `cuda`, `auto` when unset) and is reported without any probe; `effective_device` is the resolved device (`cpu` or `cuda`), and resolving it when `requested_device` is `auto` requires an `onnxruntime.get_available_providers()` probe.
 
 ### `code_index usage`
 

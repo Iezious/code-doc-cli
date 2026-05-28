@@ -5,9 +5,10 @@ Implements the rules pinned by ``docs/architecture/architecture.md``'s
 when a ``.git/`` marker is present at the root) parsed via ``pathspec`` with
 ``GitWildMatchPattern``, ``config.ignores`` (additive), an extension filter
 derived from the active plugin registry, a 1 MiB max-file-size cap, a NUL
-byte binary probe over the first 8 KiB, the symlink policy (files followed,
-directories skipped, missing targets warned), and UTF-8 decoding with a
-``replace`` fallback on ``UnicodeDecodeError``.
+byte binary probe over the first 8 KiB, the symlink policy (file and
+directory symlinks are followed; a visited-set keyed by ``Path.resolve()``
+catches loops and is warned-and-skipped; missing targets are warned), and
+UTF-8 decoding with a ``replace`` fallback on ``UnicodeDecodeError``.
 
 The walker does not raise on per-file problems in Phase 4: every failure
 becomes a stderr warning via :func:`code_index.errors.write_log_stderr` and
@@ -118,8 +119,10 @@ def walk(root: Path, config: CodeIndexConfig) -> Iterator[WalkedFile]:
     (matched against paths relative to each ``.gitignore``'s own directory,
     using ``pathspec`` with ``GitWildMatchPattern``), additive
     ``config.ignores`` patterns, plugin-registered extension filter, 1 MiB
-    cap, NUL byte binary probe, symlink policy (files followed, directories
-    skipped, missing targets warned), UTF-8 with ``replace`` fallback.
+    cap, NUL byte binary probe, symlink policy (file and directory symlinks
+    are followed, with a visited-set keyed by resolved canonical path that
+    warns and skips on a cycle; missing targets warned), UTF-8 with
+    ``replace`` fallback.
 
     Per-file failures (oversize, binary, decode, missing symlink target,
     OS errors) are reported with a stderr warning and the file is skipped;
@@ -136,6 +139,10 @@ def walk(root: Path, config: CodeIndexConfig) -> Iterator[WalkedFile]:
     # parsed PathSpec for that file. Only populated when gitignore_active.
     gitignore_specs: dict[Path, _Spec] = {}
 
+    # Seed the visited-set with the resolved root so a symlink pointing back
+    # at the root terminates immediately rather than recursing forever.
+    visited: set[Path] = {root_abs}
+
     yield from _walk_dir(
         root_abs,
         root_abs,
@@ -144,6 +151,7 @@ def walk(root: Path, config: CodeIndexConfig) -> Iterator[WalkedFile]:
         ignores_spec,
         gitignore_specs,
         gitignore_active,
+        visited,
     )
 
 
@@ -160,6 +168,7 @@ def _walk_dir(
     ignores_spec: _Spec,
     gitignore_specs: dict[Path, _Spec],
     gitignore_active: bool,
+    visited: set[Path],
 ) -> Iterator[WalkedFile]:
     """Recursive helper: iterate entries in ``current`` and recurse into directories.
 
@@ -169,6 +178,16 @@ def _walk_dir(
     ``registry`` is the resolved :class:`code_index.languages.LanguageRegistry`;
     typed as ``object`` here to avoid a public import cycle with the
     ``languages`` package.
+
+    ``visited`` is the active recursion stack of resolved canonical paths —
+    every directory currently being walked, from the root down to the caller
+    of this frame. Both real subdirectories and symlinked directories are
+    checked against it before recursion; on a hit (i.e. descending would
+    revisit an ancestor already in flight) the walker emits
+    ``walker: skipping symlink cycle at <path>`` on stderr and skips.
+    Entries are removed on the way back out, so two sibling symlinks
+    pointing at the same real directory are both followed — they do not
+    appear in each other's stacks.
     """
     # Load a `.gitignore` from this directory if applicable.
     if gitignore_active:
@@ -195,6 +214,8 @@ def _walk_dir(
 
         # Symlink policy is checked up front because it changes the meaning of
         # `is_dir()` / `is_file()` below (Path.is_dir resolves the link).
+        # Both file and directory symlinks are followed; the visited-set
+        # below catches loops introduced by dir symlinks.
         is_symlink: bool = entry.is_symlink()
         if is_symlink:
             try:
@@ -209,17 +230,16 @@ def _walk_dir(
                     f"walker: skipping broken symlink {entry}"
                 )
                 continue
-            if entry.is_dir():
-                # Symlinks to directories are not followed — documented policy.
-                continue
-            # Symlink to file: fall through into the file branch, yielding the
-            # link path (not the resolved target).
+            # Symlinks to files fall through to the file branch yielding the
+            # link path (not the resolved target). Symlinks to directories
+            # are followed below; cycle detection happens at the recursion
+            # gate via the visited-set.
 
         # Apply exclude/ignore filters using the *rel-from-root* path. For
         # directories pass a trailing slash so `pathspec` treats `foo/`
         # rules as matching the directory itself.
         rel_posix = rel.as_posix()
-        is_dir = entry.is_dir() and not is_symlink  # symlink-to-file handled above
+        is_dir = entry.is_dir()
 
         if _excluded(
             rel_posix,
@@ -234,15 +254,36 @@ def _walk_dir(
             continue
 
         if is_dir:
-            yield from _walk_dir(
-                entry,
-                root,
-                registry,
-                default_spec,
-                ignores_spec,
-                gitignore_specs,
-                gitignore_active,
-            )
+            # Resolve canonical path before recursing so a symlink loop is
+            # caught regardless of whether the entry is a real directory or
+            # a directory symlink. ``Path.resolve()`` collapses symlinks and
+            # ``..`` segments on both POSIX and Windows.
+            try:
+                resolved = entry.resolve()
+            except OSError as exc:
+                write_log_stderr(f"walker: could not resolve {entry}: {exc}")
+                continue
+            if resolved in visited:
+                write_log_stderr(f"walker: skipping symlink cycle at {entry}")
+                continue
+            visited.add(resolved)
+            try:
+                yield from _walk_dir(
+                    entry,
+                    root,
+                    registry,
+                    default_spec,
+                    ignores_spec,
+                    gitignore_specs,
+                    gitignore_active,
+                    visited,
+                )
+            finally:
+                # Treat `visited` as a stack: pop on the way back out so a
+                # sibling that resolves to the same canonical path is still
+                # followed. Only ancestors on the current call chain count
+                # as a "cycle".
+                visited.discard(resolved)
             continue
 
         # File branch (regular file or file-symlink that survived the

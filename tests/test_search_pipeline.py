@@ -38,6 +38,7 @@ class FakeBackend:
 
     name: str = "fake:tiny"
     dim: int = 4
+    device: str = "cpu"
 
     def __init__(self, mapping: dict[str, list[float]]) -> None:
         self._mapping = mapping
@@ -290,9 +291,7 @@ def test_hybrid_fuses_both_pools(tmp_path: Path) -> None:
         _rebuild_fts(conn)
 
         backend = FakeBackend({"uniquetoken": [1.0, 0.0, 0.0, 0.0]})
-        results = search(
-            conn, "uniquetoken", backend=backend, mode="hybrid", k=10
-        )
+        results = search(conn, "uniquetoken", backend=backend, mode="hybrid", k=10)
 
         names = [r.name for r in results]
         # Both pool winners must be present in the fused list.
@@ -467,9 +466,7 @@ def test_zero_results_returns_empty_list(tmp_path: Path) -> None:
         )
         _rebuild_fts(conn)
 
-        results = search(
-            conn, "xxxnotpresentxxx", backend=None, mode="bm25"
-        )
+        results = search(conn, "xxxnotpresentxxx", backend=None, mode="bm25")
         assert results == []
     finally:
         conn.close()
@@ -549,9 +546,7 @@ def test_bm25_k_caps_candidate_pool(tmp_path: Path) -> None:
             )
         _rebuild_fts(conn)
 
-        results = search(
-            conn, "matchme", backend=None, mode="bm25", k=20, bm25_k=10
-        )
+        results = search(conn, "matchme", backend=None, mode="bm25", k=20, bm25_k=10)
         # The candidate pool is capped at 10, so at most 10 results survive
         # to hydration even though k=20.
         assert len(results) <= 10

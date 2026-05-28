@@ -33,7 +33,7 @@ The architecture docs are the source of truth for design decisions. Don't add co
 ## Build & Test Commands
 
 - Install (dev environment): `uv sync --extra dev`
-- Install (editable CLI): `uv tool install --editable .`
+- Install (editable CLI): `uv tool install --editable ".[cpu]"` (or `".[gpu]"` on a CUDA box) — the fastembed backend is a `[cpu]`/`[gpu]` extra, not a base dep
 - Tests: `uv run pytest`
 - Lint: `uv run ruff check`
 - Format: `uv run ruff format`

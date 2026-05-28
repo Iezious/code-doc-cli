@@ -27,7 +27,10 @@ import numpy as np
 import pytest
 
 from code_index.config import CodeIndexConfig
+from code_index.embeddings import device as device_module
 from code_index.embeddings import factory as factory_module
+from code_index.embeddings import fastembed as fastembed_module
+from code_index.embeddings.device import CUDA_PROVIDER
 from code_index.embeddings.factory import from_config
 from code_index.embeddings.fastembed import FastembedBackend
 from code_index.errors import EXIT_BACKEND, CodeIndexError, Kinds
@@ -85,6 +88,7 @@ def _install_noop_init(monkeypatch: pytest.MonkeyPatch, stub_model: _StubModel) 
         model: str,
         batch_size: int = 32,
         cache_dir: str | None = None,
+        device: str | None = None,
     ) -> None:
         # Bypass the real wrap shell so the test exercises ``encode``'s wrap
         # in isolation.
@@ -92,6 +96,7 @@ def _install_noop_init(monkeypatch: pytest.MonkeyPatch, stub_model: _StubModel) 
         self._batch_size = batch_size
         self.dim = 768
         self.name = "fastembed:jina-code-v2"
+        self.device = "cpu"
 
     monkeypatch.setattr(FastembedBackend, "__init__", fake_init)
 
@@ -151,6 +156,7 @@ def test_from_config_wraps_constructor_failure(
         model: str,
         batch_size: int = 32,
         cache_dir: str | None = None,
+        device: str | None = None,
     ) -> None:
         raise RuntimeError("simulated init failure")
 
@@ -185,6 +191,7 @@ def test_from_config_passes_through_code_index_error(
         model: str,
         batch_size: int = 32,
         cache_dir: str | None = None,
+        device: str | None = None,
     ) -> None:
         raise inner
 
@@ -312,6 +319,104 @@ def test_wrapped_encode_envelope_round_trips(
 
     assert round_tripped["error"]["code"] == 20
     assert round_tripped["error"]["kind"] == "backend.encode_failed"
+
+
+class _CapturingTextEmbedding:
+    """Stub for ``fastembed.TextEmbedding`` that records construction kwargs.
+
+    Records the kwargs the production ``__init__`` passes (notably the
+    provider selection) and exposes the nested
+    ``model.tokenizer.enable_truncation`` attribute path the truncation
+    override touches, so real construction proceeds without a download.
+    """
+
+    last_kwargs: dict[str, object] | None = None
+
+    class model:  # noqa: N801 - mirror fastembed's nested attribute path
+        class tokenizer:
+            @staticmethod
+            def enable_truncation(*_args: object, **_kwargs: object) -> None:
+                return None
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        type(self).last_kwargs = kwargs
+
+    @staticmethod
+    def get_embedding_size(_model: str) -> int:
+        return 768
+
+
+def _install_capturing_text_embedding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> type[_CapturingTextEmbedding]:
+    """Replace the real ``TextEmbedding`` with the capturing stub."""
+    _CapturingTextEmbedding.last_kwargs = None
+    monkeypatch.setattr(fastembed_module, "TextEmbedding", _CapturingTextEmbedding)
+    return _CapturingTextEmbedding
+
+
+def test_init_cuda_passes_cuda_provider_and_sets_device(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Resolved ``cuda`` constructs with the CUDA provider and device=='cuda'."""
+    monkeypatch.setattr(
+        device_module,
+        "available_providers",
+        lambda: [CUDA_PROVIDER, "CPUExecutionProvider"],
+    )
+    captured = _install_capturing_text_embedding(monkeypatch)
+
+    backend = FastembedBackend(model=_DEFAULT_MODEL, batch_size=32, device="cuda")
+
+    assert backend.device == "cuda"
+    assert captured.last_kwargs is not None
+    providers = captured.last_kwargs.get("providers")
+    assert isinstance(providers, list)
+    assert CUDA_PROVIDER in providers
+
+
+def test_init_cpu_omits_cuda_provider_and_sets_device(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Resolved ``cpu`` constructs without the CUDA provider and device=='cpu'."""
+    monkeypatch.setattr(
+        device_module,
+        "available_providers",
+        lambda: ["CPUExecutionProvider"],
+    )
+    captured = _install_capturing_text_embedding(monkeypatch)
+
+    backend = FastembedBackend(model=_DEFAULT_MODEL, batch_size=32, device="cpu")
+
+    assert backend.device == "cpu"
+    assert captured.last_kwargs is not None
+    # CPU path passes no CUDA provider (providers defaults to None — fastembed's
+    # CPU-default construction, behaviorally unchanged from before this step).
+    assert captured.last_kwargs.get("providers") is None
+
+
+def test_init_cuda_unavailable_falls_back_to_cpu_with_warning(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """``device='cuda'`` with no provider → CPU, no provider kwarg, one warning."""
+    monkeypatch.setattr(
+        device_module,
+        "available_providers",
+        lambda: ["CPUExecutionProvider"],
+    )
+    captured = _install_capturing_text_embedding(monkeypatch)
+
+    backend = FastembedBackend(model=_DEFAULT_MODEL, batch_size=32, device="cuda")
+
+    assert backend.device == "cpu"
+    assert captured.last_kwargs is not None
+    assert captured.last_kwargs.get("providers") is None
+
+    err = capsys.readouterr().err
+    # Exactly one fallback warning line mentioning the env var and CPU fallback.
+    warning_lines = [line for line in err.splitlines() if "CODE_INDEX_DEVICE" in line]
+    assert len(warning_lines) == 1
 
 
 def test_voyage_branch_still_raises_unchanged(

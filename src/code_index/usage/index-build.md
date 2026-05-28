@@ -66,5 +66,5 @@ The embedding model is downloaded on first run and cached under the user home di
 ## Notes
 
 - Re-running `index build` on a populated index forces a full rebuild. Prefer `index sync` for incremental updates.
-- The walker does not follow directory symlinks (loops are not possible); it does follow file symlinks.
+- The walker follows both file and directory symlinks. A visited-set keyed by resolved canonical path catches cycles; on a hit the offending entry is skipped with a `walker: skipping symlink cycle at <path>` warning on stderr.
 - Files are decoded as UTF-8; on `UnicodeDecodeError` the walker retries with `errors="replace"` and warns.

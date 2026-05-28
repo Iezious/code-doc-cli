@@ -67,6 +67,7 @@ class FakeBackend:
 
     name: str = "fake:tiny"
     dim: int = _EMBED_DIM
+    device: str = "cpu"
 
     def __init__(self) -> None:
         self.calls: list[list[str]] = []

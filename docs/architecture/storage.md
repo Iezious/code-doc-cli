@@ -33,7 +33,7 @@ meta(
   key TEXT PRIMARY KEY,
   value TEXT
 )
--- holds: schema_version, code_index_version, embed_model, embed_dim
+-- holds: schema_version, code_index_version, embed_model, embed_dim, embed_device (informational)
 
 files(
   path TEXT PRIMARY KEY,
@@ -166,3 +166,11 @@ What this changed in the docs:
 - [cli](cli.md): `index sync` prose and synopsis rewritten (no `--since`); `config show` reference to `last_commit` removed.
 - [mvp-phases](mvp-phases.md): Phase 6 `index sync` deliverable rewritten. Phase 7 `config show` deliverable no longer lists `last_commit`.
 - [roadmap](roadmap.md): "Separate `files` table" entry removed — the table is now MVP, landing in Phase 6.
+
+### Update 2026-05-28: device provenance and unknown-engine detection
+
+**`meta.embed_device` is informational only.** A new `meta.embed_device` key records which device built the index (`cpu` or `cuda`). It is display-only — surfaced by `config show` (see [cli](cli.md)) — and is **never** used to gate reads. Device is not part of index identity: fastembed-CPU and fastembed-CUDA produce the same `backend.name`, the same `embed_dim`, and the same vectors modulo ~4th-decimal float noise, so a cross-device read is valid by construction (see [embeddings](embeddings.md)). `verify_index_compat` is unchanged and does not consult `embed_device`. For an index built before this feature the key is absent and renders as null / "unknown".
+
+**Unknown / outdated-engine detection already lives in `meta` — stated explicitly.** The `meta` table is a generic `(key TEXT, value TEXT)` KV store readable with bare SQLite — no `sqlite-vec` and no FTS5 extension required. This is why version and provenance detection works even when the vec extension is missing or broken, and runs before any extension-dependent query. An outdated install opening a newer index reads `meta.schema_version` and fails loud with `index.schema_mismatch` (code 10); or reads an `meta.embed_model` it does not recognize and fails with `index.embed_model_mismatch` (code 11). `meta` also stamps `code_index_version` for diagnostics. See [errors-and-exit-codes](errors-and-exit-codes.md) for the codes.
+
+**No sidecar.** Provenance lives in the single index file, reaffirming the single-file storage decision. A sidecar provenance file is rejected: it would contradict single-file storage and introduce a desync hazard — copying `index.sqlite` without the sidecar would make provenance lie. The capability is already delivered by `meta`.

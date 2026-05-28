@@ -20,6 +20,7 @@ from __future__ import annotations
 import numpy as np
 from fastembed import TextEmbedding
 
+from code_index.embeddings.device import CUDA_PROVIDER, preload_cuda_dlls, resolve_device
 from code_index.errors import EXIT_BACKEND, CodeIndexError, Kinds, write_log_stderr
 
 # Per-chunk token cap for embeddings. Smaller than the model's native 8192
@@ -63,12 +64,14 @@ class FastembedBackend:
 
     name: str
     dim: int
+    device: str
 
     def __init__(
         self,
         model: str,
         batch_size: int = 16,
         cache_dir: str | None = None,
+        device: str | None = None,
     ) -> None:
         """Instantiate a fastembed text-embedding model.
 
@@ -82,9 +85,35 @@ class FastembedBackend:
         cache_dir:
             Where fastembed stores downloaded ONNX files. ``None`` uses
             fastembed's library default (under the user home).
+        device:
+            Raw requested device (``auto`` | ``cpu`` | ``cuda``). ``None``
+            resolves from the ``CODE_INDEX_DEVICE`` env var. The value is
+            resolved exactly once here via
+            :func:`~code_index.embeddings.device.resolve_device` (with
+            ``warn=True``, so a requested-but-unavailable CUDA falls back to
+            CPU with a single stderr warning) and stored on ``self.device``.
+            When the resolved device is ``cuda`` the CUDA execution provider
+            is passed to fastembed's ``TextEmbedding``; otherwise fastembed's
+            CPU default is used.
         """
+        # Resolve the device once. The warning path (requested cuda but no
+        # provider) belongs on build/search runs, hence warn=True.
+        self.device = resolve_device(device, warn=True)
+        # Drive the TextEmbedding provider selection from the resolved device.
+        # The installed fastembed (CPU dist) and fastembed-gpu both accept a
+        # `providers=[...]` kwarg; passing the CUDA provider (with a CPU
+        # fallback) selects GPU when available. ``providers=None`` is
+        # fastembed's default and is equivalent to the prior CPU-default
+        # construction, so the CPU path is behaviorally unchanged.
+        providers: list[str] | None = None
+        if self.device == "cuda":
+            providers = [CUDA_PROVIDER, "CPUExecutionProvider"]
+            # Load the cuDNN/cuBLAS DLLs (from the `gpu` extra's nvidia wheels)
+            # before session creation; otherwise onnxruntime can't find them on
+            # Windows and silently falls back to CPU. No-op on a CPU build.
+            preload_cuda_dlls()
         try:
-            self._model = TextEmbedding(model_name=model, cache_dir=cache_dir)
+            self._model = TextEmbedding(model_name=model, cache_dir=cache_dir, providers=providers)
             self._batch_size = batch_size
             # Read dim once from the underlying model — do not hardcode.
             self.dim = int(TextEmbedding.get_embedding_size(model))

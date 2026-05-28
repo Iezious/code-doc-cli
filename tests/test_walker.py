@@ -324,7 +324,7 @@ def test_file_symlink_is_followed(tmp_path: Path) -> None:
     assert "link.py" in rels
 
 
-def test_directory_symlink_is_not_followed(tmp_path: Path) -> None:
+def test_directory_symlink_is_followed(tmp_path: Path) -> None:
     if not _can_symlink(tmp_path):
         pytest.skip("symlink creation not permitted on this host")
     real_dir = tmp_path / "real_dir"
@@ -335,9 +335,56 @@ def test_directory_symlink_is_not_followed(tmp_path: Path) -> None:
 
     results = list(walk(tmp_path, _config()))
     rels = _rels(results)
+    # Directory symlinks are followed; rel_path reflects the link as walked,
+    # not the resolved target — consistent with file-symlink behavior.
     assert "real_dir/inside.py" in rels
-    # The walker does not descend into symlinked directories.
-    assert "link_dir/inside.py" not in rels
+    assert "link_dir/inside.py" in rels
+
+
+def test_symlink_cycle_is_detected_and_skipped(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    if not _can_symlink(tmp_path):
+        pytest.skip("symlink creation not permitted on this host")
+    a = tmp_path / "a"
+    a.mkdir()
+    (a / "file.py").write_text("x = 1\n", encoding="utf-8")
+    # Self-loop: descending into `a/loop` resolves back to `a`, which the
+    # walker has already entered, so the visited-set hits on first try.
+    os.symlink(a, a / "loop", target_is_directory=True)
+
+    results = list(walk(tmp_path, _config()))
+    rels = [r.rel_path.as_posix() for r in results]
+    # The real file is yielded exactly once; the cycle does not duplicate it.
+    assert rels.count("a/file.py") == 1
+    err = capsys.readouterr().err
+    assert "walker: skipping symlink cycle" in err
+
+
+def test_directory_symlink_to_sibling_tree_is_followed(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    if not _can_symlink(tmp_path):
+        pytest.skip("symlink creation not permitted on this host")
+    pkg_a = tmp_path / "pkg_a"
+    pkg_a.mkdir()
+    (pkg_a / "mod.py").write_text("x = 1\n", encoding="utf-8")
+    pkg_b = tmp_path / "pkg_b"
+    pkg_b.mkdir()
+    os.symlink(pkg_a, pkg_b / "link", target_is_directory=True)
+
+    results = list(walk(tmp_path, _config()))
+    rels = [r.rel_path.as_posix() for r in results]
+    rel_set = set(rels)
+    # Both the real tree and the cross-directory link surface the same file
+    # under their respective walked paths.
+    assert "pkg_a/mod.py" in rel_set
+    assert "pkg_b/link/mod.py" in rel_set
+    # No duplicates: each path is yielded exactly once.
+    assert len(rels) == len(rel_set)
+    # And no cycle warning for a non-cyclic chain.
+    err = capsys.readouterr().err
+    assert "skipping symlink cycle" not in err
 
 
 def test_broken_symlink_warns_and_skips(

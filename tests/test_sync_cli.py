@@ -66,6 +66,7 @@ class FakePlugin:
 class FakeBackend:
     name: str = "fake:tiny"
     dim: int = _EMBED_DIM
+    device: str = "cpu"
 
     def encode(self, texts: list[str]) -> np.ndarray:
         if not texts:

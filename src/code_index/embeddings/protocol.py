@@ -23,6 +23,7 @@ class EmbeddingBackend(Protocol):
 
     name: str
     dim: int
+    device: str
 
     def encode(self, texts: list[str]) -> np.ndarray:
         """Return embeddings of shape ``(len(texts), dim)``."""

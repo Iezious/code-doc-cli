@@ -17,7 +17,7 @@ This doc owns the schema. Loader internals belong in the implementation; rationa
 - **JSON.** No comments. Painful for a file humans hand-edit.
 - **YAML.** Multiple dialects, indentation-sensitive, surprising type coercions.
 - **`pyproject.toml` `[tool.code_index]` section.** Couples the index config to the *consuming* project's Python packaging, which is wrong for polyglot projects that may not have a `pyproject.toml` at all.
-- **Environment-variable overrides for behavior keys.** Hidden state that breaks reproducibility. Env vars are reserved for *secrets* (e.g. backend credentials), not behavior.
+- **Environment-variable overrides for behavior keys.** Hidden state that breaks reproducibility. Env vars are reserved for *secrets* (e.g. backend credentials) and machine-local execution tuning that does not change index identity — see "Update 2026-05-28: machine-local execution tuning via env" below.
 
 ## Schema
 
@@ -94,3 +94,11 @@ The intent is that the file is small enough to read on first open and obvious en
 
 - **Per-plugin config sub-tables.** The schema rationale anticipates `[code_index.languages.<lang>]` future sections (see "One table, one place" in this doc), but no concrete schema exists. The Phase 3 LSL plugin defers OSSL recognition because it would need exactly such a sub-table (see [chunking-and-languages](chunking-and-languages.md), LSL section). Decide before Phase 4+ work depends on it, or before a Phase 3 OSSL bug forces the question. Two paths: (a) commit a concrete sub-table schema (key naming, nesting rules, validation, surfacing in `config show`), or (b) commit a "deferred to v1.x" stance and document that `extra_languages` is the only per-plugin extension point in MVP.
 - Workspace-level config that defaults values across sibling projects is open in [tool-and-data-split](tool-and-data-split.md) and is cut from MVP (see [mvp-scope](mvp-scope.md)).
+
+### Update 2026-05-28: machine-local execution tuning via env
+
+The original rejected-alternative rule reserved env vars strictly for secrets. That rule is amended: env vars are reserved for secrets (e.g. backend credentials) **and machine-local execution tuning that does not change index identity**. The reproducibility concern that drove the original rule still holds — env vars must not silently change *what* gets built into the index. They may select *where* the build runs when that choice produces equivalent output.
+
+The first concrete instance is `CODE_INDEX_DEVICE = auto | cpu | cuda` (default `auto`), which selects whether embedding runs on CPU or a CUDA GPU. The resolved device does not change `backend.name`, the vector dimension, or the stored vectors (modulo ~4th-decimal float noise), so it does not affect index identity — see [embeddings](embeddings.md) for the device semantics and the warn+CPU-fallback policy.
+
+Device is deliberately **not** a `[code_index]` TOML key and is **not** added to the schema table above. `config.toml` is committed and shared; a per-machine `cuda` value would break a teammate without an NVIDIA GPU. Keeping device in a machine-local env var lets the committed config stay portable across machines, with `auto` as the default that does the right thing on each box.
