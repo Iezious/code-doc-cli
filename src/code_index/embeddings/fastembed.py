@@ -20,7 +20,7 @@ from __future__ import annotations
 import numpy as np
 from fastembed import TextEmbedding
 
-from code_index.embeddings.device import CUDA_PROVIDER, resolve_device
+from code_index.embeddings.device import CUDA_PROVIDER, preload_cuda_dlls, resolve_device
 from code_index.errors import EXIT_BACKEND, CodeIndexError, Kinds, write_log_stderr
 
 # Per-chunk token cap for embeddings. Smaller than the model's native 8192
@@ -108,6 +108,10 @@ class FastembedBackend:
         providers: list[str] | None = None
         if self.device == "cuda":
             providers = [CUDA_PROVIDER, "CPUExecutionProvider"]
+            # Load the cuDNN/cuBLAS DLLs (from the `gpu` extra's nvidia wheels)
+            # before session creation; otherwise onnxruntime can't find them on
+            # Windows and silently falls back to CPU. No-op on a CPU build.
+            preload_cuda_dlls()
         try:
             self._model = TextEmbedding(model_name=model, cache_dir=cache_dir, providers=providers)
             self._batch_size = batch_size

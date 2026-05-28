@@ -18,11 +18,22 @@ MVP shipped. Current version: `0.2.1` (patch: fixes fastembed ONNX OOM on long c
 
 ## Install
 
+The embedding backend ships as one of two mutually-exclusive extras — pick the one that matches your hardware. A bare install with no extra has **no** embedding backend.
+
+CPU (default, zero-config, works everywhere):
+
 ```bash
-uv tool install git+https://github.com/Iezious/code_index.git
+uv tool install "code_index[cpu] @ git+https://github.com/Iezious/code_index.git"
 ```
 
-Installs `code_index` on PATH. Reads per-project config from `docs/.helpers/config.toml`.
+GPU (CUDA, recommended on an NVIDIA box — bundles `fastembed-gpu` + the CUDA/cuDNN/cuBLAS wheels):
+
+```bash
+uv tool install "code_index[gpu] @ git+https://github.com/Iezious/code_index.git"
+CODE_INDEX_DEVICE=cuda code_index index build
+```
+
+Both install `code_index` on PATH and read per-project config from `docs/.helpers/config.toml`. See [GPU acceleration](#gpu-acceleration-cuda) below for how device selection works.
 
 ### Update
 
@@ -30,44 +41,37 @@ Installs `code_index` on PATH. Reads per-project config from `docs/.helpers/conf
 uv tool upgrade code_index
 ```
 
-Pulls the latest from the same source URL used at install.
+Pulls the latest from the same source URL (and extra) used at install.
 
 ### Pinning to a tag
 
 ```bash
-uv tool install git+https://github.com/Iezious/code_index.git@v0.2.1
+uv tool install "code_index[cpu] @ git+https://github.com/Iezious/code_index.git@v0.2.1"
 ```
 
-Optional, for users who want a stable version rather than tracking `HEAD`.
+Optional, for users who want a stable version rather than tracking `HEAD`. Swap `[cpu]` for `[gpu]` as needed.
 
 ### For engine development
 
 ```bash
-uv tool install --editable .
+uv tool install --editable ".[cpu]"     # or ".[gpu]" on a CUDA box
 ```
 
-If you're hacking on `code_index` itself, clone the repo and use the editable install. Build/test/typecheck commands live in `CLAUDE.md`.
+If you're hacking on `code_index` itself, clone the repo and use the editable install with an explicit backend extra. Build/test/typecheck commands live in `CLAUDE.md`.
 
 ### GPU acceleration (CUDA)
 
-The base install keeps `fastembed` (CPU) as the default hard dependency, so the zero-config, offline CPU path is unchanged — you get CPU embedding out of the box with no extra steps.
+`fastembed` (CPU) and `fastembed-gpu` are mutually-exclusive PyPI distributions: they share the `fastembed` import namespace and pull mutually-exclusive onnxruntime builds (`onnxruntime` CPU vs `onnxruntime-gpu`), so exactly one must be installed. That is why the backend is split into the `[cpu]` and `[gpu]` install extras above rather than a single base dependency — `pyproject.toml` declares them as `[tool.uv]` conflicts so they can never be resolved together.
 
-GPU acceleration is a manual package swap. Replace `fastembed` with `fastembed-gpu`, then point `code_index` at CUDA:
+The `[gpu]` extra additionally bundles the `nvidia-cudnn-cu12` / `nvidia-cublas-cu12` / `nvidia-cuda-nvrtc-cu12` wheels, and `code_index` calls `onnxruntime.preload_dlls()` at backend startup to load them — so a `[gpu]` install works out of the box on Windows without manually putting cuDNN on `PATH`.
 
-```bash
-uv pip install fastembed-gpu          # replaces fastembed
-CODE_INDEX_DEVICE=cuda code_index index build
-```
-
-`fastembed` and `fastembed-gpu` are mutually-exclusive PyPI distributions: they share the same `fastembed` import namespace and pull mutually-exclusive onnxruntime builds (`onnxruntime` CPU vs `onnxruntime-gpu`). Install one or the other, never both. Because an additive install extra cannot satisfy both cleanly, there is intentionally no `[gpu]` extra and `pyproject.toml` is unchanged — the swap is manual by design.
-
-The `CODE_INDEX_DEVICE` env var selects where the model runs:
+Once installed with `[gpu]`, the `CODE_INDEX_DEVICE` env var selects where the model runs:
 
 - `auto` (default): use CUDA if the ONNX runtime offers a CUDA provider, else CPU. Silent — no warning.
 - `cuda`: explicit request. If the CUDA provider is unavailable at runtime, warn on stderr and fall back to CPU.
 - `cpu`: force CPU even on a GPU box.
 
-The env var only selects a provider; whether CUDA is actually available depends on which onnxruntime build is installed. Setting `CODE_INDEX_DEVICE=cuda` on a box with only the base `fastembed` means the CUDA provider is not registered, so `code_index` falls back to CPU with a one-line stderr warning.
+The env var only selects a provider; whether CUDA is actually available depends on which extra you installed. Setting `CODE_INDEX_DEVICE=cuda` on a `[cpu]` install means the CUDA provider is not registered, so `code_index` falls back to CPU with a one-line stderr warning.
 
 ## Quick start
 

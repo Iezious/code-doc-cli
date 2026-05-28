@@ -90,7 +90,7 @@ Device is machine-local and is not a TOML key — see [config](config.md) for th
 
 **Device is not index identity.** `backend.name` (e.g. `"fastembed:jina-code-v2"`) carries the model, not the device. fastembed-CPU and fastembed-CUDA produce the same `backend.name`, the same dim, and the same vectors modulo ~4th-decimal float noise. Therefore `verify_index_compat` is unchanged, and a cross-device read (index built on CUDA, queried on CPU, or vice versa) is silently valid by construction — no new warning, no gate. This is deliberately better than warning: it avoids a stderr warning on every cross-device search. The device an index was built on is recorded for display only as `meta.embed_device` (see [storage](storage.md)).
 
-**Packaging: CPU stays default, GPU is a documented manual swap.** `fastembed` (CPU) and `fastembed-gpu` are mutually-exclusive PyPI distributions: they share the same `fastembed` import namespace and pull mutually-exclusive onnxruntime builds (`onnxruntime` CPU vs `onnxruntime-gpu`). You install one or the other, never both. An additive `[gpu]` install extra therefore does not work cleanly. The base install keeps `fastembed` (CPU) as the default hard dependency, preserving the zero-config, offline CPU default. GPU users perform a documented manual swap: `uv pip install fastembed-gpu` (replacing `fastembed`), then set `CODE_INDEX_DEVICE=cuda`. The env var only selects a provider; whether CUDA is actually available depends on which onnxruntime build is installed. These compose: `CODE_INDEX_DEVICE=cuda` on a box with only the base `fastembed` means the CUDA provider is not registered, which is exactly the "requested cuda unavailable → warn + CPU fallback" path.
+**Packaging: CPU stays default, GPU is a documented manual swap.** *(Superseded — see "Update 2026-05-28: GPU install via cpu/gpu extras" below. The manual-swap mechanism is replaced by mutually-exclusive install extras; the mutual-exclusivity reasoning here still holds.)* `fastembed` (CPU) and `fastembed-gpu` are mutually-exclusive PyPI distributions: they share the same `fastembed` import namespace and pull mutually-exclusive onnxruntime builds (`onnxruntime` CPU vs `onnxruntime-gpu`). You install one or the other, never both. An additive `[gpu]` install extra therefore does not work cleanly. The base install keeps `fastembed` (CPU) as the default hard dependency, preserving the zero-config, offline CPU default. GPU users perform a documented manual swap: `uv pip install fastembed-gpu` (replacing `fastembed`), then set `CODE_INDEX_DEVICE=cuda`. The env var only selects a provider; whether CUDA is actually available depends on which onnxruntime build is installed. These compose: `CODE_INDEX_DEVICE=cuda` on a box with only the base `fastembed` means the CUDA provider is not registered, which is exactly the "requested cuda unavailable → warn + CPU fallback" path.
 
 **Implementation note.** `FastembedBackend` passes `cuda=True` / `providers=[...]` to fastembed's `TextEmbedding` constructor based on the resolved device, and probes `onnxruntime.get_available_providers()` at construction both to implement `auto` and to emit the clean stderr warning when `cuda` was requested but unavailable — instead of relying on ONNX's noisy low-level fallback warning.
 
@@ -100,3 +100,23 @@ Device is machine-local and is not a TOML key — see [config](config.md) for th
 - **Device as a TOML key.** Committing a per-machine device value breaks portability across teammates; `auto` default plus env override is the portable mechanism.
 
 Forward note: env-selectable *backend* (not device) from a TOML-permitted set is a roadmap item, not stage one — see [roadmap](roadmap.md).
+
+### Update 2026-05-28: GPU install via cpu/gpu extras
+
+**Decision.** The fastembed backend is no longer a base hard dependency. It ships as one of two mutually-exclusive install extras, so `uv tool install "code_index[gpu] @ git+…"` delivers a working GPU stack in one shot:
+
+- `cpu` → `fastembed` (CPU `onnxruntime`).
+- `gpu` → `fastembed-gpu` plus the `nvidia-cudnn-cu12` / `nvidia-cublas-cu12` / `nvidia-cuda-nvrtc-cu12` wheels (and, transitively, `onnxruntime-gpu`).
+
+`pyproject.toml` declares `[tool.uv].conflicts = [[{extra="cpu"},{extra="gpu"}]]` so the two can never be resolved together. The `dev` extra carries `fastembed` directly so `uv sync --extra dev` and the test suite run on CPU.
+
+**DLL discovery.** `FastembedBackend` calls `onnxruntime.preload_dlls()` (via `device.preload_cuda_dlls()`) on the resolved-`cuda` path before constructing `TextEmbedding`. onnxruntime does not auto-discover the `nvidia-*-cu12` wheel DLL directories on Windows; without the preload, a correctly-installed `[gpu]` stack silently falls back to CPU. The call is guarded and a no-op on a CPU build.
+
+**Rationale.** The earlier manual-swap design (keep `fastembed` in base, `uv pip install fastembed-gpu` to replace it) worked but was not one-shot and left the Windows cuDNN-on-PATH problem to the user. Splitting into extras makes the GPU install a single command and bundles the runtime DLLs.
+
+**Implications.**
+
+- A bare install with **no** extra has no embedding backend by design — every install path must name `[cpu]` or `[gpu]`. The factory's lazy `import fastembed` is the failure point if neither is present.
+- Device selection semantics (`auto`/`cuda`/`cpu`, warn-and-fall-back) are unchanged; only how the backend gets onto the box changed.
+
+**Rejected alternative.** Keeping `fastembed` in base deps plus an additive `[gpu]` extra — rejected because an extra can only add, never remove `fastembed`, so `[gpu]` would install both distributions into the shared `fastembed` namespace and corrupt the install.

@@ -65,6 +65,25 @@ def cuda_available() -> bool:
     return CUDA_PROVIDER in available_providers()
 
 
+def preload_cuda_dlls() -> None:
+    """Best-effort load of onnxruntime's CUDA/cuDNN/cuBLAS DLLs into the process.
+
+    The ``gpu`` extra ships cuDNN/cuBLAS via the ``nvidia-*-cu12`` wheels, but
+    onnxruntime does not auto-discover those wheel DLL directories on Windows;
+    without an explicit load the CUDA execution provider fails to initialize at
+    session creation and silently falls back to CPU (all cores hot). onnxruntime
+    >= 1.21 exposes ``preload_dlls()`` which loads them from the nvidia wheels.
+    Guarded: a missing onnxruntime, an older build lacking the helper, or any
+    load error is swallowed — session creation will fall back to CPU on its own.
+    """
+    try:
+        import onnxruntime  # type: ignore[reportMissingTypeStubs]
+
+        onnxruntime.preload_dlls()  # type: ignore[reportUnknownMemberType,attr-defined]
+    except Exception:
+        pass
+
+
 def resolve_device(requested: str | None = None, *, warn: bool = True) -> str:
     """Resolve requested (default: requested_device()) to 'cpu' or 'cuda'.
 

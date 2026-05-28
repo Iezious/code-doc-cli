@@ -8,7 +8,6 @@ authors = [{ name = "serge" }]
 dependencies = [
     "typer>=0.12",
     "rich>=13",
-    "fastembed>=0.4",
     "sqlite-vec>=0.1.6",
     "tree-sitter>=0.23",
     "tree-sitter-language-pack>=0.4",
@@ -19,8 +18,33 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# The fastembed backend ships as one of two mutually-exclusive extras:
+# `cpu` (fastembed + onnxruntime CPU) or `gpu` (fastembed-gpu +
+# onnxruntime-gpu + the nvidia CUDA/cuDNN/cuBLAS wheels). They share the
+# `fastembed` import namespace and pull conflicting onnxruntime builds, so
+# exactly one must be installed — enforced by [tool.uv].conflicts below.
+# A bare install (no extra) has no embedding backend by design; pick one.
+cpu = ["fastembed>=0.4"]
+gpu = [
+    "fastembed-gpu>=0.4",
+    # onnxruntime-gpu (pulled by fastembed-gpu) does not declare its CUDA
+    # runtime deps, so name the full CUDA-12 wheel set here. Without the
+    # complete set, onnxruntime.preload_dlls() logs missing-DLL warnings
+    # (e.g. cufft64_11.dll, cudart64_12.dll) even though the CUDA EP loads.
+    "nvidia-cudnn-cu12>=9",
+    "nvidia-cublas-cu12",
+    "nvidia-cuda-nvrtc-cu12",
+    "nvidia-cuda-runtime-cu12",
+    "nvidia-cufft-cu12",
+    "nvidia-curand-cu12",
+]
 voyage = ["voyageai>=0.2"]
-dev = ["pytest>=8", "ruff>=0.6", "pyright>=1.1.350", "syrupy>=4"]
+dev = ["fastembed>=0.4", "pytest>=8", "ruff>=0.6", "pyright>=1.1.350", "syrupy>=4"]
+
+[tool.uv]
+# `cpu` and `gpu` install incompatible fastembed/onnxruntime distributions
+# into the same import namespace; never resolve them together.
+conflicts = [[{ extra = "cpu" }, { extra = "gpu" }]]
 
 [project.scripts]
 code_index = "code_index.cli:app"
