@@ -18,6 +18,7 @@ from __future__ import annotations
 from code_index.config import CodeIndexConfig
 from code_index.errors import EXIT_BACKEND, EXIT_USAGE, CodeIndexError, Kinds
 
+from .device import requested_device
 from .fastembed import FastembedBackend
 from .protocol import EmbeddingBackend
 
@@ -40,9 +41,12 @@ def from_config(config: CodeIndexConfig) -> EmbeddingBackend:
     backend = config.embed_backend
     if backend == "fastembed":
         try:
+            # Read CODE_INDEX_DEVICE here (the env read is centralized in the
+            # factory; the backend stays a pure resolver of what it is handed).
             return FastembedBackend(
                 model=config.embed_model,
                 batch_size=config.embed_batch_size,
+                device=requested_device(),
             )
         except CodeIndexError:
             raise
@@ -50,10 +54,7 @@ def from_config(config: CodeIndexConfig) -> EmbeddingBackend:
             raise CodeIndexError(
                 code=EXIT_BACKEND,
                 kind=Kinds.BACKEND_MODEL_DOWNLOAD_FAILED,
-                message=(
-                    f"fastembed model {config.embed_model!r} failed to load: "
-                    f"{exc}"
-                ),
+                message=(f"fastembed model {config.embed_model!r} failed to load: {exc}"),
                 detail={
                     "model": config.embed_model,
                     "cause": str(exc),
@@ -66,9 +67,6 @@ def from_config(config: CodeIndexConfig) -> EmbeddingBackend:
     raise CodeIndexError(
         code=EXIT_USAGE,
         kind=Kinds.CLI_NOT_IMPLEMENTED,
-        message=(
-            "voyage backend not available in this build "
-            "(lands in Phase 7)"
-        ),
+        message=("voyage backend not available in this build (lands in Phase 7)"),
         detail={"embed_backend": backend},
     )

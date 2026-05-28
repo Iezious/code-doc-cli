@@ -48,6 +48,27 @@ uv tool install --editable .
 
 If you're hacking on `code_index` itself, clone the repo and use the editable install. Build/test/typecheck commands live in `CLAUDE.md`.
 
+### GPU acceleration (CUDA)
+
+The base install keeps `fastembed` (CPU) as the default hard dependency, so the zero-config, offline CPU path is unchanged — you get CPU embedding out of the box with no extra steps.
+
+GPU acceleration is a manual package swap. Replace `fastembed` with `fastembed-gpu`, then point `code_index` at CUDA:
+
+```bash
+uv pip install fastembed-gpu          # replaces fastembed
+CODE_INDEX_DEVICE=cuda code_index index build
+```
+
+`fastembed` and `fastembed-gpu` are mutually-exclusive PyPI distributions: they share the same `fastembed` import namespace and pull mutually-exclusive onnxruntime builds (`onnxruntime` CPU vs `onnxruntime-gpu`). Install one or the other, never both. Because an additive install extra cannot satisfy both cleanly, there is intentionally no `[gpu]` extra and `pyproject.toml` is unchanged — the swap is manual by design.
+
+The `CODE_INDEX_DEVICE` env var selects where the model runs:
+
+- `auto` (default): use CUDA if the ONNX runtime offers a CUDA provider, else CPU. Silent — no warning.
+- `cuda`: explicit request. If the CUDA provider is unavailable at runtime, warn on stderr and fall back to CPU.
+- `cpu`: force CPU even on a GPU box.
+
+The env var only selects a provider; whether CUDA is actually available depends on which onnxruntime build is installed. Setting `CODE_INDEX_DEVICE=cuda` on a box with only the base `fastembed` means the CUDA provider is not registered, so `code_index` falls back to CPU with a one-line stderr warning.
+
 ## Quick start
 
 ```bash

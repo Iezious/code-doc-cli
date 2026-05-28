@@ -748,7 +748,11 @@ def test_config_show_success_json_roundtrips(
     read_only_built: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """``config show`` returns ``{"config": {...}, "index": {...}}``."""
+    """``config show`` returns ``{config, index, requested_device,
+    effective_device}``.
+
+    Phase 8 (feature 008 step 004) added the two top-level device siblings.
+    """
     del read_only_built
     exit_code, out, _err = _run(
         ["--format", "json", "config", "show"], capsys
@@ -756,7 +760,12 @@ def test_config_show_success_json_roundtrips(
     assert exit_code == 0, out
     parsed: dict[str, Any] = json.loads(out)
     assert isinstance(parsed, dict)
-    assert set(parsed.keys()) == {"config", "index"}
+    assert set(parsed.keys()) == {
+        "config",
+        "index",
+        "requested_device",
+        "effective_device",
+    }
     assert isinstance(parsed["config"], dict)
     assert parsed["index"] is None or isinstance(parsed["index"], dict)
 

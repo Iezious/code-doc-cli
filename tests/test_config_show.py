@@ -113,7 +113,12 @@ def test_fresh_init_index_is_null(
     )
     assert exit_code == 0
     payload: dict[str, Any] = json.loads(out)
-    assert set(payload.keys()) == {"config", "index"}
+    assert set(payload.keys()) == {
+        "config",
+        "index",
+        "requested_device",
+        "effective_device",
+    }
     assert payload["index"] is None
     assert err == ""
 
@@ -146,17 +151,20 @@ def test_after_build_index_block_is_populated(
         "code_index_version",
         "embed_model",
         "embed_dim",
+        "embed_device",
     }
     for key, value in index_block.items():
         assert isinstance(value, str), (key, value)
         assert value != "", (key, value)
     # JSON key ordering inside the ``index`` block is the contract pinned
-    # in ``001.context.md`` ("JSON key ordering").
+    # in ``001.context.md`` ("JSON key ordering"); ``embed_device`` is the
+    # final element (Phase 8, step 004).
     assert list(index_block.keys()) == [
         "schema_version",
         "code_index_version",
         "embed_model",
         "embed_dim",
+        "embed_device",
     ]
 
 
@@ -345,4 +353,195 @@ def test_stream_discipline_json_happy_path(
     # Round-trips through json.loads without raising.
     payload: dict[str, Any] = json.loads(out)
     assert isinstance(payload, dict)
+    assert err == ""
+
+
+# ---------------------------------------------------------------------------
+# 9. Device fields (Phase 8, step 004) — top-level siblings + index.embed_device
+# ---------------------------------------------------------------------------
+
+
+def test_requested_device_defaults_to_auto_when_unset(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """``requested_device`` is ``auto`` when ``CODE_INDEX_DEVICE`` is unset.
+
+    Break the onnxruntime probe to prove ``requested_device`` performs no
+    probe: it must report ``auto`` even when the probe is broken. The broken
+    probe is swallowed by :func:`available_providers` (step 001), so the
+    command still exits 0 and ``effective_device`` degrades to ``cpu``.
+    """
+    monkeypatch.delenv("CODE_INDEX_DEVICE", raising=False)
+
+    import onnxruntime  # type: ignore[reportMissingTypeStubs]
+
+    def _boom() -> list[str]:
+        raise RuntimeError("probe is broken")
+
+    monkeypatch.setattr(onnxruntime, "get_available_providers", _boom)
+
+    _init(tmp_path, monkeypatch, capsys)
+
+    exit_code, out, err = _run(
+        ["--format", "json", "config", "show"], capsys
+    )
+    assert exit_code == 0
+    payload: dict[str, Any] = json.loads(out)
+    assert payload["requested_device"] == "auto"
+    assert err == ""
+
+
+def test_requested_device_reflects_env_value(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """``requested_device`` echoes a set ``CODE_INDEX_DEVICE`` value, no probe."""
+    monkeypatch.setenv("CODE_INDEX_DEVICE", "cpu")
+
+    def _boom() -> list[str]:
+        raise RuntimeError("probe must not run for requested_device")
+
+    monkeypatch.setattr(
+        "code_index.embeddings.device.available_providers", _boom
+    )
+
+    _init(tmp_path, monkeypatch, capsys)
+
+    exit_code, out, _err = _run(
+        ["--format", "json", "config", "show"], capsys
+    )
+    assert exit_code == 0
+    payload: dict[str, Any] = json.loads(out)
+    assert payload["requested_device"] == "cpu"
+
+
+def test_effective_device_cuda_unavailable_no_warning(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Requested ``cuda`` + CUDA unavailable -> ``effective_device == cpu``,
+    NO stderr warning (quiet probe, ``warn=False``)."""
+    monkeypatch.setenv("CODE_INDEX_DEVICE", "cuda")
+    # CUDA provider absent -> resolution falls back to cpu.
+    monkeypatch.setattr(
+        "code_index.embeddings.device.available_providers",
+        lambda: ["CPUExecutionProvider"],
+    )
+
+    _init(tmp_path, monkeypatch, capsys)
+
+    exit_code, out, err = _run(
+        ["--format", "json", "config", "show"], capsys
+    )
+    assert exit_code == 0
+    payload: dict[str, Any] = json.loads(out)
+    assert payload["requested_device"] == "cuda"
+    assert payload["effective_device"] == "cpu"
+    # Diagnostic stance: config show never warns about device resolution.
+    assert err == ""
+
+
+def test_effective_device_cuda_available(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Requested ``cuda`` + CUDA available -> ``effective_device == cuda``."""
+    monkeypatch.setenv("CODE_INDEX_DEVICE", "cuda")
+    monkeypatch.setattr(
+        "code_index.embeddings.device.available_providers",
+        lambda: ["CUDAExecutionProvider", "CPUExecutionProvider"],
+    )
+
+    _init(tmp_path, monkeypatch, capsys)
+
+    exit_code, out, _err = _run(
+        ["--format", "json", "config", "show"], capsys
+    )
+    assert exit_code == 0
+    payload: dict[str, Any] = json.loads(out)
+    assert payload["effective_device"] == "cuda"
+
+
+def test_config_show_survives_broken_probe(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A broken onnxruntime probe must not fail ``config show``.
+
+    ``get_available_providers`` raising is swallowed by
+    :func:`available_providers` (step 001), so ``effective_device`` degrades
+    to ``cpu`` and the command exits 0 with no warning.
+    """
+    monkeypatch.setenv("CODE_INDEX_DEVICE", "auto")
+
+    import onnxruntime  # type: ignore[reportMissingTypeStubs]
+
+    def _raise() -> list[str]:
+        raise RuntimeError("onnxruntime is broken")
+
+    monkeypatch.setattr(onnxruntime, "get_available_providers", _raise)
+
+    _init(tmp_path, monkeypatch, capsys)
+
+    exit_code, out, err = _run(
+        ["--format", "json", "config", "show"], capsys
+    )
+    assert exit_code == 0
+    payload: dict[str, Any] = json.loads(out)
+    assert payload["effective_device"] == "cpu"
+    assert err == ""
+
+
+def test_index_embed_device_empty_for_pre_feature_index(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    warm_fastembed: None,
+) -> None:
+    """A pre-feature index (no ``embed_device`` meta row) renders the value
+    per the existing sibling-key convention: present-but-absent meta is the
+    empty string ``""`` (matching ``schema_version``/``embed_model`` handling),
+    not JSON ``null``."""
+    del warm_fastembed
+    _copy_fixture(tmp_path)
+    _init(tmp_path, monkeypatch, capsys)
+    _build(tmp_path, capsys)
+
+    # Simulate a pre-feature index by clearing the ``embed_device`` row.
+    db_path: Path = tmp_path / "docs" / ".helpers" / "index.sqlite"
+    conn = sqlite3.connect(str(db_path))
+    try:
+        conn.execute("DELETE FROM meta WHERE key = 'embed_device'")
+        conn.commit()
+    finally:
+        conn.close()
+
+    exit_code, out, _err = _run(
+        ["--format", "json", "config", "show"], capsys
+    )
+    assert exit_code == 0
+    payload: dict[str, Any] = json.loads(out)
+    assert payload["index"]["embed_device"] == ""
+
+
+def test_text_mode_renders_device_fields(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Text mode prints both device fields under a ``device:`` stanza."""
+    monkeypatch.setenv("CODE_INDEX_DEVICE", "cpu")
+    _init(tmp_path, monkeypatch, capsys)
+
+    exit_code, out, err = _run(["config", "show"], capsys)
+    assert exit_code == 0
+    assert "device:" in out
+    assert "requested_device: cpu" in out
+    assert "effective_device: cpu" in out
     assert err == ""

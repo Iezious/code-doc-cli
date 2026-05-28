@@ -49,10 +49,12 @@ def fastembed_spy(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
 
     Returning the spy lets each test inspect call args. The spy's return value
     is the instance that `from_config` should return when dispatched to
-    fastembed.
+    fastembed. Also clears ``CODE_INDEX_DEVICE`` so the factory's env read
+    defaults to ``auto`` unless a test sets it explicitly.
     """
     spy = MagicMock(name="FastembedBackend")
     monkeypatch.setattr(factory_module, "FastembedBackend", spy)
+    monkeypatch.delenv("CODE_INDEX_DEVICE", raising=False)
     return spy
 
 
@@ -68,8 +70,75 @@ def test_factory_dispatches_fastembed(fastembed_spy: MagicMock) -> None:
     fastembed_spy.assert_called_once_with(
         model="jinaai/jina-embeddings-v2-base-code",
         batch_size=32,
+        device="auto",
     )
     assert result is fastembed_spy.return_value
+
+
+def test_factory_passes_requested_device(
+    fastembed_spy: MagicMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The factory reads CODE_INDEX_DEVICE and passes the raw value through."""
+    monkeypatch.setenv("CODE_INDEX_DEVICE", "cuda")
+    config = _make_config(
+        embed_backend="fastembed",
+        embed_model="jinaai/jina-embeddings-v2-base-code",
+        embed_batch_size=32,
+    )
+
+    from_config(config)
+
+    kwargs: Any = fastembed_spy.call_args.kwargs
+    assert kwargs["device"] == "cuda"
+
+
+def test_factory_from_config_resolves_device_end_to_end(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With a real FastembedBackend (init stubbed), the resolved device sticks.
+
+    Monkeypatches the env to ``cuda`` and the onnxruntime probe so the CUDA
+    provider is reported available, then asserts the backend exposes
+    ``device == "cuda"``. The real ``TextEmbedding`` is replaced with a stub so
+    no model download occurs.
+    """
+    from code_index.embeddings import device as device_module
+    from code_index.embeddings import fastembed as fastembed_module
+
+    monkeypatch.setenv("CODE_INDEX_DEVICE", "cuda")
+    monkeypatch.setattr(
+        device_module,
+        "available_providers",
+        lambda: [device_module.CUDA_PROVIDER, "CPUExecutionProvider"],
+    )
+
+    class _StubModel:
+        class model:  # noqa: N801 - mirror fastembed's nested attribute path
+            class tokenizer:
+                @staticmethod
+                def enable_truncation(*_args: object, **_kwargs: object) -> None:
+                    return None
+
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
+            pass
+
+    monkeypatch.setattr(fastembed_module, "TextEmbedding", _StubModel)
+    monkeypatch.setattr(
+        fastembed_module.TextEmbedding,
+        "get_embedding_size",
+        staticmethod(lambda _model: 768),
+        raising=False,
+    )
+
+    config = _make_config(
+        embed_backend="fastembed",
+        embed_model="jinaai/jina-embeddings-v2-base-code",
+        embed_batch_size=32,
+    )
+
+    backend = from_config(config)
+
+    assert backend.device == "cuda"
 
 
 def test_factory_passes_batch_size(fastembed_spy: MagicMock) -> None:

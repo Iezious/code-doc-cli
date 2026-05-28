@@ -106,12 +106,21 @@ def test_config_show_valid_text(capsys: pytest.CaptureFixture[str]) -> None:
     assert "embed_backend: fastembed" in out
     assert "embed_model: jinaai/jina-embeddings-v2-base-code" in out
     assert "index: not built" in out
+    # Phase 8 (feature 008 step 004) appends a ``device:`` stanza carrying
+    # ``requested_device``/``effective_device`` (top-level JSON siblings, not
+    # config keys). Scope the sorted-keys check to the ``config:`` stanza so it
+    # keeps asserting config-key ordering, not the device lines.
+    assert "device:" in out
+    assert "requested_device:" in out
+    assert "effective_device:" in out
     # Keys inside the ``config`` block are sorted alphabetically.
-    config_keys: list[str] = [
-        line.strip().split(":", 1)[0]
-        for line in out.splitlines()
-        if line.startswith("  ") and ":" in line
-    ]
+    lines: list[str] = out.splitlines()
+    config_start: int = lines.index("config:")
+    config_keys: list[str] = []
+    for line in lines[config_start + 1 :]:
+        if not (line.startswith("  ") and ":" in line):
+            break
+        config_keys.append(line.strip().split(":", 1)[0])
     assert config_keys == sorted(config_keys)
     # Valid fixture, no unknown keys -> stderr is empty.
     assert err == ""

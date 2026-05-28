@@ -71,6 +71,7 @@ class FakePlugin:
 class FakeBackend:
     name: str = "fake:tiny"
     dim: int = _EMBED_DIM
+    device: str = "cpu"
 
     def encode(self, texts: list[str]) -> np.ndarray:
         if not texts:
@@ -223,6 +224,21 @@ def test_rebuild_happy_path_row_counts_unchanged(
     assert after == before, (
         f"rebuild row counts diverged: before={before}, after={after}"
     )
+
+    # The auto-rebuild DELETE clears ``embed_device`` and the post-pipeline
+    # stamp re-writes it: exactly one row, consistent with the backend, not
+    # a stale value left behind.
+    db_path: Path = tmp_path / "docs" / ".helpers" / "index.sqlite"
+    conn = open_index(db_path)
+    try:
+        rows = conn.execute(
+            "SELECT value FROM meta WHERE key = 'embed_device'"
+        ).fetchall()
+        assert len(rows) == 1
+        assert rows[0][0] == "cpu"
+        assert get_meta(conn, "embed_device") == "cpu"
+    finally:
+        conn.close()
 
 
 # ---------------------------------------------------------------------------

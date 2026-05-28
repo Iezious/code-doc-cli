@@ -23,6 +23,9 @@ dist/
 .DS_Store
 Thumbs.db
 
+# Machine-local env (device/runtime tuning; never committed)
+.env
+
 # code_index indices (build artifacts if run inside own tree)
 *.sqlite
 *.sqlite-shm

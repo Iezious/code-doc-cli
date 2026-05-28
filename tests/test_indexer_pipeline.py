@@ -89,6 +89,7 @@ class FakeBackend:
 
     name: str = "fake:tiny"
     dim: int = _EMBED_DIM
+    device: str = "cpu"
 
     def __init__(self) -> None:
         self.calls: list[list[str]] = []
@@ -262,6 +263,9 @@ def test_fresh_db_happy_path(
     try:
         assert get_meta(conn, "embed_model") == "fake:tiny"
         assert get_meta(conn, "embed_dim") == str(_EMBED_DIM)
+        # ``embed_device`` records the backend's resolved device (cpu here).
+        assert get_meta(conn, "embed_device") == backend.device
+        assert get_meta(conn, "embed_device") == "cpu"
 
         # FTS5 round-trip: a token from one of the inserted chunks must
         # come back from a chunks_fts MATCH query.
@@ -399,6 +403,8 @@ def test_dry_run_skips_encode_and_inserts(
             conn.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0] == 0
         )
         assert conn.execute("SELECT COUNT(*) FROM files").fetchone()[0] == 0
+        # The stamp block is inside ``if not dry_run``, so no device row.
+        assert get_meta(conn, "embed_device") is None
     finally:
         conn.close()
 

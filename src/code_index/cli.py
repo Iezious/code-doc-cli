@@ -37,6 +37,7 @@ from code_index import search as search_module
 from code_index import symbols as symbols_module
 from code_index import sync as sync_module
 from code_index.config import CodeIndexConfig, discover_config_path, load_config
+from code_index.embeddings.device import requested_device, resolve_device
 from code_index.errors import (
     EXIT_CONFIG,
     EXIT_INDEX_MISSING,
@@ -1043,6 +1044,7 @@ _INDEX_META_KEYS: tuple[str, ...] = (
     "code_index_version",
     "embed_model",
     "embed_dim",
+    "embed_device",
 )
 
 
@@ -1113,17 +1115,25 @@ def _read_index_meta(db_path: Path) -> dict[str, str] | None:
 
 
 def _config_show_text(
-    config_block: dict[str, Any], index_block: dict[str, str] | None
+    config_block: dict[str, Any],
+    index_block: dict[str, str] | None,
+    requested: str,
+    effective: str,
 ) -> str:
     """Render the text-mode body for ``config show``.
 
-    Two stanzas separated by a blank line:
+    Three stanzas separated by blank lines:
 
     - ``config:`` header followed by two-space-indented ``key: value`` lines
       sorted by key.
     - ``index:`` header followed by two-space-indented ``key: value`` lines
       (still sorted within the block) when the index is built, or
       ``index: not built`` when ``index_block`` is ``None``.
+    - ``device:`` header followed by ``requested_device`` and
+      ``effective_device`` lines (Phase 8, step 004). These are top-level
+      siblings of ``config``/``index`` in the JSON shape — they are not
+      config keys and carry no ``[mismatch]`` marker (device is not index
+      identity; see ``004.context.md``).
 
     When ``config_block["embed_model"]`` and ``index_block["embed_model"]``
     disagree, the ``index`` block's ``embed_model`` line gets a trailing
@@ -1141,8 +1151,18 @@ def _config_show_text(
             rendered = str(value)
         config_lines.append(f"  {key}: {rendered}")
 
+    device_lines: list[str] = [
+        "device:",
+        f"  requested_device: {requested}",
+        f"  effective_device: {effective}",
+    ]
+
     if index_block is None:
-        return "\n".join(config_lines) + "\n\nindex: not built"
+        return (
+            "\n".join(config_lines)
+            + "\n\nindex: not built\n\n"
+            + "\n".join(device_lines)
+        )
 
     configured_model: Any = config_block.get("embed_model")
     indexed_model: str = index_block.get("embed_model", "")
@@ -1160,7 +1180,13 @@ def _config_show_text(
         )
         index_lines.append(f"  {key}: {value_str}{suffix}")
 
-    return "\n".join(config_lines) + "\n\n" + "\n".join(index_lines)
+    return (
+        "\n".join(config_lines)
+        + "\n\n"
+        + "\n".join(index_lines)
+        + "\n\n"
+        + "\n".join(device_lines)
+    )
 
 
 @config_app.command("show")
@@ -1169,8 +1195,15 @@ def cli_config_show(ctx: typer.Context) -> None:
 
     The Phase 7 body extends the Phase 1 ``{"config": {...}}`` shape to a
     sibling ``"index"`` block carrying ``meta.schema_version``,
-    ``meta.code_index_version``, ``meta.embed_model``, and ``meta.embed_dim``
-    (decision 4 in ``docs/plans/007.config-show-json-polish/context.md``).
+    ``meta.code_index_version``, ``meta.embed_model``, ``meta.embed_dim``, and
+    (Phase 8, step 004) ``meta.embed_device`` (decision 4 in
+    ``docs/plans/007.config-show-json-polish/context.md``).
+
+    Phase 8 (step 004) also adds two top-level siblings of ``config``/``index``:
+    ``requested_device`` (raw ``CODE_INDEX_DEVICE``, no probe) and
+    ``effective_device`` (resolved ``cpu``/``cuda`` via a quiet probe). Device
+    resolution never fails or warns here — a broken/missing onnxruntime
+    degrades to ``cpu`` silently (see ``004.context.md``, "Diagnostic stance").
 
     ``config show`` is the only subcommand that does not gate on schema,
     model, or dim mismatch — it reports the drift instead. The only
@@ -1194,6 +1227,13 @@ def cli_config_show(ctx: typer.Context) -> None:
     db_path: Path = project_root / "docs" / ".helpers" / "index.sqlite"
     index_block: dict[str, str] | None = _read_index_meta(db_path)
 
+    # Top-level device siblings (Phase 8, step 004). ``requested_device`` is
+    # the raw env value with no probe; ``effective_device`` resolves it with a
+    # quiet probe (``warn=False``) so ``config show`` never warns or fails on a
+    # broken/missing onnxruntime (step 001 degrades to ``cpu`` silently).
+    requested: str = requested_device()
+    effective: str = resolve_device(warn=False)
+
     if format_value == "json":
         ordered_index: dict[str, str] | None
         if index_block is None:
@@ -1203,11 +1243,15 @@ def cli_config_show(ctx: typer.Context) -> None:
         document: dict[str, Any] = {
             "config": config_block,
             "index": ordered_index,
+            "requested_device": requested,
+            "effective_device": effective,
         }
         write_json_stdout(document)
         return
 
-    write_result_stdout(_config_show_text(config_block, index_block))
+    write_result_stdout(
+        _config_show_text(config_block, index_block, requested, effective)
+    )
 
 
 # ---------------------------------------------------------------------------
