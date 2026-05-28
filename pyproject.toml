@@ -1,6 +1,6 @@
 [project]
 name = "code_index"
-version = "0.2.1"
+version = "0.3.0"
 description = "Universal codebase index and hybrid semantic/lexical search for documentation generation"
 requires-python = ">=3.11"
 license = { text = "MIT" }

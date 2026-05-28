@@ -14,7 +14,7 @@ For large polyglot codebases, asking Claude agents to read raw source for every 
 
 ## Status
 
-MVP shipped. Current version: `0.2.1` (patch: fixes fastembed ONNX OOM on long chunks by capping per-text tokens at 1024 and lowering default `embed_batch_size` from 32 to 16; adds `chunks_chunked` to the `index build` / `index rebuild` JSON shape; fixes init JSON refuse-path Windows backslashes). Tags `v0.1.0` and `v0.2.0` are on prior milestones; `v0.2.1` follows this commit. See `docs/architecture/` for design decisions, `docs/plans/` for delivered features, and `docs/CLAUDE.md` for the documentation layout.
+MVP shipped. Current version: `0.3.0` (feature: CUDA GPU acceleration for the fastembed backend — `CODE_INDEX_DEVICE` device selection, split `[cpu]`/`[gpu]` install extras so a git install delivers a working GPU stack in one command, and `onnxruntime.preload_dlls()` at startup so cuDNN loads on Windows without manual PATH setup). Tags `v0.1.0`, `v0.2.0`, and `v0.2.1` are on prior milestones; `v0.3.0` follows this commit. See `docs/architecture/` for design decisions, `docs/plans/` for delivered features, and `docs/CLAUDE.md` for the documentation layout.
 
 ## Install
 
